@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import accounts, adaptive, ai, store, syllabus
+from app import accounts, config as instance, adaptive, ai, store, syllabus
 
 WEB = Path(os.environ.get("RPRAXE_WEB", "/srv/web"))
 USERS_FILE = Path(os.environ.get("RPRAXE_USERS", "/data/state/users.json"))
@@ -129,47 +129,96 @@ def login(response: Response, user: str = Form(...), pas: str = Form("", alias="
 
 _REQ_IS_HTTPS = {"v": False}
 
-def sso_enabled() -> bool:
-    return bool(os.environ.get("RPRAXE_SSO_SECRET") and os.environ.get("RPRAXE_SSO_HEADER"))
+def sso_zapnuto() -> bool:
+    """SSO platí, jen když je zapnuté a má tajemství — jinak by stačil cizí header."""
+    return instance.sso_zapnuto() or bool(
+        os.environ.get("RPRAXE_SSO_SECRET") and os.environ.get("RPRAXE_SSO_HEADER"))
+
+
+def sso_cfg() -> dict:
+    cfg = instance.sso_cfg()
+    if not cfg.get("tajemstvi"):
+        cfg["tajemstvi"] = os.environ.get("RPRAXE_SSO_SECRET", "")
+    if not (cfg.get("hlavka_jmeno") or "").strip():
+        cfg["hlavka_jmeno"] = os.environ.get("RPRAXE_SSO_HEADER", "Remote-User")
+    if not (cfg.get("hlavka_role") or "").strip():
+        cfg["hlavka_role"] = os.environ.get("RPRAXE_SSO_ROLE_HEADER", "")
+    return cfg
 
 
 def sso_button() -> str:
-    if not sso_enabled():
+    if not sso_zapnuto():
         return ""
     return ('<p class="tiny muted">nebo</p><button class="ghost" formaction="/login/sso">'
-            'přihlásit účtem školy / instituce</button>')
+            'přihlásit účtem instituce</button>')
+
+
+def role_z_skupin(skupiny: str, mapa: dict | None = None) -> str:
+    """Skupiny z brány -> role. Vlastní mapování má přednost před výčtem zvyklostí."""
+    d = (skupiny or "").lower()
+    for skupina, role in (mapa or {}).items():
+        role = str(role or "").strip().lower()
+        if role in ("admin", "teacher", "student") and str(skupina).lower() in d:
+            return role
+    if "admin" in d:
+        return "admin"
+    if any(g in d for g in ("teacher", "lektor", "ucitel", "skola", "vyucujici")):
+        return "teacher"
+    return "student"
 
 
 def sso_login(request: Request) -> str | None:
-    """Přihlášení přes bránu (Authelia / forward_auth): jméno z headeru + sdílené tajemstvo.
+    """Přihlášení přes bránu: jméno z headeru + sdílené tajemství.
 
-    Bez tajemstva header ignorujeme — klient by si jinak jméno vymyslel sám. Brána má
-    `header_up Remote-User <přihlášený>` a `header_up X-Rpraxe-SSO {env.RPRAXE_SSO_SECRET}`.
+    Bez tajemství header ignorujeme — klient by si jméno vymyslel sám. Brána posílá
+    `header_up Remote-User <přihlášený>` a `header_up X-Rpraxe-SSO <tajemství>`.
     """
-    secret_env = os.environ.get("RPRAXE_SSO_SECRET", "").strip()
-    name_hdr = os.environ.get("RPRAXE_SSO_HEADER", "").strip()
-    if not secret_env or not name_hdr:
+    cfg = sso_cfg()
+    tajemstvi = str(cfg.get("tajemstvi") or "").strip()
+    hlavka = str(cfg.get("hlavka_jmeno") or "").strip()
+    if not tajemstvi or not hlavka or not sso_zapnuto():
         return None
-    if not hmac.compare_digest(request.headers.get(SSO_SECRET_HEADER, ""), secret_env):
+    if not hmac.compare_digest(request.headers.get(SSO_SECRET_HEADER, ""), tajemstvi):
         return None
-    user = (request.headers.get(name_hdr) or "").strip().lower()
-    if not user:
+    uzivatel = (request.headers.get(hlavka) or "").strip().lower()
+    if not uzivatel:
         return None
-    role = "student"
-    role_hdr = os.environ.get("RPRAXE_SSO_ROLE_HEADER", "").strip()
-    if role_hdr:
-        groups = (request.headers.get(role_hdr) or "").lower()
-        if "admin" in groups:
-            role = "admin"
-        elif any(g in groups for g in ("teacher", "lektor", "ucitel", "skola")):
-            role = "teacher"
-    users = ensure_users()
-    if user not in users:
-        users[user] = {"hash": hash_pw(secrets.token_urlsafe(12)), "role": role,
-                       "created": time.time(), "sso": True}
-        accounts.save(USERS_FILE, users)
-        print(f"[rpraxe] SSO: založen účet {user} ({role})", flush=True)
-    return user
+    povoleni = [str(x).lower() for x in (cfg.get("povolene_ucety") or [])]
+    if povoleni and uzivatel not in povoleni:
+        print(f"[rpraxe] SSO: {uzivatel} není na seznamu povolených účtů", flush=True)
+        return None
+    role = role_z_skupin(request.headers.get(cfg.get("hlavka_role") or "", ""),
+                         cfg.get("role_z_skupin") or {})
+    uzivatele = ensure_users()
+    if uzivatel not in uzivatele:
+        uzivatele[uzivatel] = {"hash": hash_pw(secrets.token_urlsafe(12)), "role": role,
+                               "created": time.time(), "sso": True}
+        accounts.save(USERS_FILE, uzivatele)
+        print(f"[rpraxe] SSO: založen účet {uzivatel} ({role})", flush=True)
+    elif uzivatele[uzivatel].get("role") != role and role != "student":
+        uzivatele[uzivatel]["role"] = role
+        accounts.save(USERS_FILE, uzivatele)
+    return uzivatel
+
+
+def sso_sonda(request: Request) -> dict:
+    """Co od brány přišlo — pro klávesnici správy, když se nikdo nepřihlásí."""
+    cfg = sso_cfg()
+    jmena = {k.lower(): (k, v[:40]) for k, v in request.headers.items()}
+    tajan = request.headers.get(SSO_SECRET_HEADER, "")
+    return {
+        "hlavka_jmeno": cfg.get("hlavka_jmeno"),
+        "jmeno_prichazi": bool(jmena.get((cfg.get("hlavka_jmeno") or "").lower())),
+        "hlavka_role": cfg.get("hlavka_role"),
+        "role_prichazi": bool((cfg.get("hlavka_role") or "") and jmena.get(cfg["hlavka_role"].lower())),
+        "tajemstvi_prichazi": bool(tajan),
+        "tajemstvi_sedi": bool(tajan and hmac.compare_digest(tajan, str(cfg.get("tajemstvi") or ""))),
+        # hlavičky, které by mohl poslat sám klient a mohly by matet — běžný
+        # User-Agent mezi to nepatří, ať to v kartě nevystraší
+        "podezrele_havicky": sorted(k for k, _ in jmena.values()
+                                    if k != "user-agent"
+                                    and any(s in k for s in ("user", "mail", "group", "role", "auth"))),
+    }
 
 
 @app.get("/login/sso")
@@ -638,6 +687,9 @@ async def api_solution(request: Request, body: SolutionBody):
 @app.get("/api/tasks")
 def api_tasks(request: Request, lesson: int | None = None, skill: str | None = None,
               status: str | None = None):
+    # koncepty vidí jen učitel a správce — student ať nedostane nic neprověřeného
+    role = ensure_users().get(current_user(request) or "", {}).get("role", "student")
+    vidim_koncepty = role in ("teacher", "admin")
     with db() as c:
         q = "SELECT * FROM tasks WHERE status != 'retired'"
         args: list = []
@@ -650,6 +702,8 @@ def api_tasks(request: Request, lesson: int | None = None, skill: str | None = N
         if status:
             q += " AND status = ?"
             args.append(status)
+        if not vidim_koncepty:
+            q += " AND status = 'approved'"
         q += " ORDER BY lesson, level, id"
         out = []
         for r in c.execute(q, args):
@@ -812,6 +866,64 @@ async def validate_task(draft: dict) -> dict:
     except Exception:  # noqa: BLE001
         pass
     return {"ok": True, "msg": "ověřeno spuštěním"}
+
+
+async def run_v_sandboxu(task: dict, code: str) -> dict:
+    """Jeden běh v sandboxu s kontrolou téhle úlohy — pro ověřování i náhled."""
+    kontrola = task.get("check") or task.get("check_r") or "FALSE"
+    payload = {"code": code, "check": kontrola, "plots": True,
+               "libraries": ["dplyr", "tidyr", "ggplot2", "readr", "forcats", "lubridate"]}
+    if task.get("dataset"):
+        payload["datasets"] = [task["dataset"]]
+    try:
+        async with httpx.AsyncClient(timeout=90) as client:
+            return (await client.post(f"{RUNNER}/run", json=payload)).json()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"runner nedostupný: {exc}"}
+
+
+async def overeni_spustenim(task: dict) -> dict:
+    """Ověří jednu úlohu ze tří stran: řešení, prázdný kód, startovací kostka.
+
+    Vrací i to, co běhy vypisovaly — učitel pak neposuzuje jen green check,
+    ale vidí výstup a stav prostředí.
+    """
+    nacti = (task.get("nacti") or "").strip()
+    reseni = (task.get("reseni") or "").strip()
+    beh_reseni = await run_v_sandboxu(task, (nacti + "\n" + reseni).strip())
+    bez_reseni = await run_v_sandboxu(task, "# zatím prázdné")
+
+    vysledek = {
+        "reseni_proslo": bool((beh_reseni.get("check") or {}).get("pass")) and not beh_reseni.get("error"),
+        "zprava_kontrolky": str((beh_reseni.get("check") or {}).get("msg") or "")[:300],
+        "vystup_reseni": str(beh_reseni.get("stdout") or beh_reseni.get("error") or "")[:2500],
+        "prostredi": (beh_reseni.get("env") or [])[:14],
+        "graf": bool(beh_reseni.get("plot")),
+        "prazdny_kod_prosel": bool((bez_reseni.get("check") or {}).get("pass")),
+    }
+    if (task.get("starter") or "").strip():
+        kostka = await run_v_sandboxu(task, (nacti + "\n" + task["starter"]).strip())
+        vysledek["kostka_prosel"] = bool((kostka.get("check") or {}).get("pass"))
+    else:
+        vysledek["kostka_prosel"] = False
+
+    duvody = []
+    if not vysledek["reseni_proslo"]:
+        duvody.append("řešení neprošlo kontrolou")
+    if vysledek["prazdny_kod_prosel"]:
+        duvody.append("kontrola propustí i prázdný kód")
+    if vysledek.get("kostka_prosel"):
+        duvody.append("kontrola propustí i startovací kostku")
+    vysledek["duvody"] = duvody
+    vysledek["ok"] = not duvody
+    return vysledek
+
+
+@app.get("/api/backups")
+def api_backups(request: Request):
+    """Stav zálohování — pro dashboard i pro krizovou obnovu."""
+    admin(request)
+    return backup_status()
 
 
 @app.get("/api/export")

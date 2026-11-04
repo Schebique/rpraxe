@@ -64,6 +64,7 @@ async function loadBoot() {
   ROLE = boot.role || "student";
   applyTheme(boot.theme || "auto");
   applyLang(boot.lang || "cs");
+  $("#nav-help").hidden = false;   // nápověda patří i pro studenty
   $("#nav-class").hidden = !["teacher", "admin"].includes(ROLE);
   $("#nav-admin").hidden = ROLE !== "admin";
   $("#who").textContent = boot.user;
@@ -313,8 +314,11 @@ async function loadLib() {
         <td><strong>${esc(t.title)}</strong><div class="tiny muted">${esc((t.skills || []).join(", "))} · ${esc(t.id)}</div></td>
         <td>${t.lesson}</td><td>${Number(t.level).toFixed(1)}</td>
         <td>${t.passed}/${t.attempts}</td>
-        <td>${t.status === "draft" ? '<span class="pill">ověřit</span>' : ""}
-            <button data-id="${esc(t.id)}" class="ghost pick">do dneška</button></td></tr>`).join("");
+        <td>${t.status === "draft" ? '<span class="pill">koncept</span>' : ""}
+            <button data-id="${esc(t.id)}" class="ghost pick">do dneška</button>
+            <button data-id="${esc(t.id)}" class="ghost look" title="úkoly, řešení a kontrola zvlášť">prozkoumat</button></td></tr>`).join("");
+    if (!["teacher", "admin"].includes(ROLE)) $$("#tasks .look").forEach(b => b.remove());
+    $$("#tasks .look").forEach(b => b.onclick = () => openReview(b.dataset.id));
     $$("#tasks .pick").forEach(b => b.onclick = async () => {
       await api("/api/pick", { method: "POST", body: JSON.stringify({ task_id: b.dataset.id }) });
       toast("Přidáno do dnešní dávky."); await loadBoot(); show("today");
@@ -355,7 +359,7 @@ async function loadProg() {
   }).join("");
   $("#spark-lbl").textContent = "plné = úlohy, světlé = zkoušely se ale neprošly";
   // odhad úrovně: krátký proužek jen tam, kde už něco změřeno je; jinak mate prázdný
-  const zmerenе = (p.skills || []).filter(s => (s.n || 0) > 0);
+  const zmerene = (p.skills || []).filter(s => (s.n || 0) > 0);
   $("#skillbars").innerHTML = (p.skills || []).map(s => {
     const n = s.n || 0;
     const prouzek = n > 0
@@ -366,7 +370,7 @@ async function loadProg() {
       + `<span class="tiny muted num">${n}×</span></div>`;
   }).join("") || "<p class='muted tiny'>zatím nic — po prvních pokusech se tady objeví tvůj profil.</p>";
   const lbl = $("#skill-lbl");
-  if (lbl) lbl.textContent = zmerenе.length
+  if (lbl) lbl.textContent = zmerene.length
     ? `Proužek = odhad úrovně (0,5 = základy, 3,5 = pokročilé), číslo u toho = kolik pokusů k tomu už máme. `
       + `Tmavý proužek = zatím nic změřeného.`
     : "Zatím nic změřeného — po prvních úlohách se tady objeví tvůj profil.";
@@ -382,6 +386,669 @@ async function loadProg() {
   $$("#hard a").forEach(a => a.onclick = e => { e.preventDefault(); openTask(a.dataset.id); show("today"); });
 }
 
+/* ------------------------------------------------------- Nápověda (Help) */
+/* Obsah je přepsaný v každém jazyce zvlášť — rozhraní překládá slovník,
+ * ale výklad se špatně skládá z frází, proto je tady celý text. */
+const HELP = {
+  cs: {
+    titulek: "Návod, jak se systémem pracuje",
+    sekce: [
+      ["Denní rutina", [
+        "Záložka Dnes ti namíchá krátkou dávku úloh z látky, kterou zrovna probíráte. Cíleně je krátká — 15 až 30 minut.",
+        "U úlohy vidíš zadání, data a okno pro tvůj R kód. Kód spustí tlačítko spustit, správnost ověří tlačítko zkontrolovat.",
+        "Když nevíš dál, tak napověda odkrývá nápovědu po kouscích. Tlačítko kouč vysvětlí konkrétní chybu, kterou vypsalo R.",
+        "Řešení se ukazuje až na požádání a systém si ho poznamená — lepší je nejdřív to zkusit sám.",
+      ]],
+      ["Kde co najdeš", [
+        "Knihovna — všechny úlohy, dá se filtrovat podle lekce, obtížnosti a hledat ve slovech. Tlačítkem do dneška si úlohu přidáš do své dávky.",
+        "Progres — úspěšnost na první dobrou, řada dní, odhady dovedností a seznam témat, kde se to nejvíc zadrhává. Dole je historie a CSV export.",
+        "Tahák — rychlý opis základů R, který zůstává na stránce, žádná vyskakovací okna.",
+        "Poznámky — u každé úlohy si můžeš nechat vlastní poznámku ve větším okně; uloží se na server a uvidíš ji i z jiného počítače.",
+      ]],
+      ["K čemu jsou poznámky", [
+        "Poznámka není hodnocení ani zpráva učiteli. Je to tvůj vlastní záznam u konkrétní úlohy: co tě na ní napálilo, na co si příště dát pozor.",
+        "Proč to má smysl: za měsíc si neneš, v čem jsi tehdy chyboval. U úlohy, která tě stála půl hodiny, je věta „pozor, group_by počítá i řádky s NA“ to nejcennější, co systém umí uchovat.",
+        "Učitel a správce je vidí v přehledu třídy — díky nim poz ná, kde skupina zápasí, i když počet pokusů vyzná dobře.",
+        "Kouč k nim nic neposílá; poznámky zůstávají tvůj text. Klidně do nich zapiš i poznámku ke svému skriptu.",
+      ]],
+      ["Nastavení účtu", [
+        "V menu uživatele je Nastavení: motiv (tmavý, světlý nebo podle systému), jazyk rozhraní a délka denní dávky.",
+        "Nastavení se ukládá na server, ne jen do prohlížeče — tak tě pozná i na jiném zařízení.",
+        "Model, který systém používá, si uživatel nevolí. Nastavuje ho správce, aby měli všichni stejného kouče.",
+      ]],
+      ["Když pracuješ ve třídě (učitel)", [
+        "Tříd může být víc — klidně se stejnými žáky v různých skupinách (ránní a odpolední kurz). Učitel si založí vlastní a vybere do ní účty; jeden účet můž být ve třídách několika.",
+        "Nová třýd: v záložce Třída je karta Třídy — napiš název, vyber žáky ze seznamu (Ctrl/Cmd přidá víc) a ulož. Vybranou třýdu lze upravit i smazat; žáci zůstanou, zmizí jen sdružení.",
+        "Přehled žáků ukazuje, v jakých třýdách kdo je.",
+        "Záložka Třída ukazuje, komu se co daří a kde se žáci opakovaně potýkají se stejnou látkou.",
+        "Nové úlohy se přidávají ve správě; vygeneruješ je tlačítkem, nebo napíšeš vlastní.",
+        "U každé úlohy je tlačítko prozkoumat: ukáže zadání, kostru, řešení a kontrolní kód zvlášť, aby se na to dalo lidsky podívat.",
+        "V tom okně je i strojové ověření (spustí řešení, pak prázdný kód) a názor modelu. Rozhoduje pořád člověk — schvaluje se tlačítkem.",
+        "Koncept (draft) se žákům neukáže, dokud není schválený.",
+      ]],
+      ["Správa systému", [
+        "Účty — přidání člověka, role (student, učitel, správce), vygenerování hesla.",
+        "Modely — provider, adresa serveru, model pro povídání i pro tvorbu úloh, API klíč. Uloží se do souboru v adresáři state, ne do obrazu.",
+        "Přihlašování — heslem, nebo přes jednotné přihlášení (SSO) z brány před celým domenovým jménem. Vypínač a údaj o hlavičkách jsou tady.",
+        "Zálohy — ruční snímek databáze a seznam snímků. Načtení ze zálohy přepíše současná data, proto se ptá na opsání slova OBNOVIT; před obnovou se vždy udělá pojistka.",
+      ]],
+      ["Bezpečnost a data", [
+        "Tvoje R kód se spouští v oddělené nádobě bez přístupu do sítě — kód se k tvým datům dostane, ven se nedostane nic.",
+        "Zálohy a databáze jsou na tvém serveru; pokud správce nenastaví externí model, data neopouštějí dům.",
+      ]],
+    ],
+    klavesy: [
+      ["Ctrl + Enter", "spustit kód"], ["Ctrl + Shift + Enter", "zkontrolovat řešení"],
+      ["Esc", "zavřít okno"],
+    ],
+  },
+  en: {
+    titulek: "How the system works",
+    sekce: [
+      ["Daily routine", [
+        "The Today tab mixes a short set of tasks from the part of the course you are in. It is deliberately short: 15 to 30 minutes.",
+        "Each task shows the assignment, the data and an editor for your R code. Run runs the code, check verifies the result.",
+        "Stuck? hint uncovers one hint at a time; the coach button explains the exact R error on screen.",
+        "The solution appears only when you ask, and the system notes that you asked — try it yourself first.",
+      ]],
+      ["Where things are", [
+        "Library — every task, filterable by lesson and difficulty, with text search. Add to today puts a task into your own set.",
+        "Progress — first-try success, day streak, estimated skills and the topics where you keep getting stuck, plus history and CSV export.",
+        "Cheat sheet — a quick R summary that stays on the page; no pop-up windows.",
+        "Notes — every task can carry your own note written in a proper text area, stored on the server and visible from any device.",
+      ]],
+      ["What the notes are for", [
+        "A note is not a grade and not a report to the teacher. It is your own line next to a specific task: what caught you out, what to watch for next time.",
+        "Why bother: in a month you will not remember what tripped you up. For a task that took half an hour, “careful, group_by counts NA rows too” is the most valuable thing the system can keep.",
+        "Teachers and admins see them in the class overview, so they can spot a struggle even when the attempt count looks fine.",
+        "The coach never receives them; notes stay your own text.",
+      ]],
+      ["Account settings", [
+        "In the user menu: theme (dark, light or system), interface language and the length of the daily set.",
+        "Settings live on the server, not only in the browser, so another device sees the same thing.",
+        "Users do not pick the model. The administrator sets it so everyone gets the same coach.",
+      ]],
+      ["Teaching a class", [
+        "The Class tab shows who is doing well and where students keep hitting the same topic.",
+        "There can be several classes, even with the same students in different groups. A teacher creates their own and picks accounts for it; one account can belong to several classes.",
+        "To add one: in the Class tab use the Classes card — type a name, pick students from the list (Ctrl/Cmd adds more) and save. A selected class can be edited or deleted; students stay, only the grouping disappears.",
+        "The student list shows which classes each person belongs to.",
+        "New tasks are added in Administration, generated by the model or written by hand.",
+        "Every task has an inspect button: assignment, starter, solution and the checking code shown separately for a human read.",
+        "That window also runs a machine check (solution, then empty code) and asks the model for criticism. A human still approves it.",
+        "Students never see a draft until it is approved.",
+      ]],
+      ["Administration", [
+        "Accounts — add a person, set a role (student, teacher, admin), generate a password.",
+        "Models — provider, server address, chat and writing model, API key. Saved into the state directory, not into the image.",
+        "Sign-in — password, or single sign-on from a gateway in front of the whole domain. The switch and header names are here.",
+        "Backups — a manual snapshot plus the list of stored ones. Restoring overwrites current data, so it asks you to type RESTORE; a safety copy is always made first.",
+      ]],
+      ["Safety and data", [
+        "Your R code runs in a separate container without network access — it can read its own data, nothing leaves.",
+        "Backups and the database stay on your server; unless the admin enables an external model, data stays home.",
+      ]],
+    ],
+    klavesy: [["Ctrl + Enter", "run code"], ["Ctrl + Shift + Enter", "check solution"], ["Esc", "close dialog"]],
+  },
+  sk: {
+    titulek: "Návod, ako so systémom pracovať",
+    sekce: [
+      ["Denná rutina", [
+        "Záložka Dnes ti namieša krátku dávku úloh z látky, ktorú práve preberáte. Zámerne je krátka — 15 až 30 minút.",
+        "Kód spustí tlačidlo spustiť, správnosť overí tlačidlo skontrolovať.",
+        "Keď nevieš ďalej, nápoveda odkrýva rady po kúskoch a tlačidlo kouč vysvetlí konkrétnu chybu R.",
+        "Riešenie sa ukáže až na požiadanie a systém si poznamená, že si sa naň pozrel.",
+      ]],
+      ["Kde čo nájdeš", [
+        "Knižnica — všetky úlohy, filter podľa lekcie a obtiažnosti, vyhľadávanie; tlačidlo do dneška pridá úlohu do tvojej dávky.",
+        "Progres — úspešnosť na prvýkrát, séria dní, odhady zručností a témy, kde sa to zachytáva.",
+        "Tahák — rýchly opis základov R, žiadne vyskakovacie okná.",
+        "Poznámky — pri úlohe si môžeš nechať vlastnú poznámku; uloží sa na server a uvidíš ju aj z iného počítača.",
+      ]],
+      ["Na čo sú poznámky", [
+        "Poznámka nie je známka ani odkaz pre učiteľa. Je to tvoj vlastný záznam pri konkrétnej úlohe: čo ťa napálilo a na čo si dať pozor.",
+        "O mesiac si nepamätáš, v čom si chyboval. Pri úlohe, ktorá trvala pol hodiny, je veta „pozor, group_by počíta aj riadky s NA“ to najcennejšie, čo systém uchová.",
+        "Učiteľ a správca ich vidia v prehľade triedy, takže všimnú, kde skupina zápasí, aj keď počet pokusov vyzerá dobre.",
+        "Kouč ich nedostáva — poznámky ostávajú tvoj text.",
+      ]],
+      ["Nastavenie účtu", [
+        "V používateľskom menu: motív (tmavý, svetlý alebo systémový), jazyk rozhrania a dĺžka dennej dávky.",
+        "Nastavenia sú na serveri, nie len v prehliadači, takže ťa pozná aj iné zariadenie.",
+        "Model si používateľ nevolí — nastavuje ho správca, aby mali všetci rovnakého kouča.",
+      ]],
+      ["Triedy", [
+        "Tried môže byť viac, aj s tými istými žiakmi v rôznych skupinách. Učiteľ si založí vlastnú a vyberie do nej účty; jeden účet môže byť v niekoľkých triedach.",
+        "Novú triedu vytvoríš v karte Triedy: napíš názov, vyber žiakov zo zoznamu (Ctrl/Cmd pridá viac) a ulož. Vybranú triedu môžeš upraviť alebo zmazať — žiaci ostanú, zmizne len združenie.",
+        "Prehľad žiakov ukazuje, v ktorých triedach kto je.",
+      ]],
+      ["Keď vyučuješ (učiteľ)", [
+        "Nové úlohy sa pridávajú v správe — vygeneruješ ich, alebo napíšeš vlastné.",
+        "Tlačidlo preskúmať ukáže zadanie, kostru, riešenie a kontrolný kód osobitne, aby sa na ne dalo pozrieť človekom.",
+        "V tom okne je aj strojové overenie (spustí riešenie, potom prázdny kód) a názor modelu. Rozhoduje človek — schvaľuje sa tlačidlom.",
+        "Pred uložením sa úloha sama overí: musí prejsť vlastným riešením a nesmie prejsť prázdny kód. Keď to nevyjde, uloženie sa odmietne a pôvodný text ostane.",
+        "Koncept sa žiakom neukáže, kým nie je schválený; upraviť ho ide cez upraviť v editore.",
+      ]],
+      ["Správa", [
+        "účty — pridať človeka, nastaviť rolu, vygenerovať heslo.",
+        "Modely — poskytovateľ, adresa, model na rozhovor a na tvorbu úloh, kľúč. Ukladá sa do adresára state, nie do obrazu.",
+        "Prihlasovanie — heslom, alebo cez jednotné prihlásenie z brány pred celou doménou.",
+        "Zálohy — ručný snímok a zoznam snímek. Obnova prepíše súčasné dáta, preto chce opsanie slova OBNOVIT; pred obnovou sa vždy urobí poistka.",
+      ]],
+      ["Bezpečnosť a dáta", [
+        "Tvoj R kód beží v oddelenej nádobe bez prístupu do siete — k svojim dátam sa dostane, von nič nedostane.",
+        "Zálohy a databáza sú na tvojom serveri; pokiaľ správca nenastaví externý model, dáta neopúšťajú dom.",
+      ]],
+    ],
+    klavesy: [["Ctrl + Enter", "spustiť kód"], ["Ctrl + Shift + Enter", "skontrolovať riešenie"],
+              ["Esc", "zavrieť okno"]],
+  },
+};
+
+function renderHelp() {
+  const box = $("#help-obsah");
+  if (!box) return;
+  const jazyk = LANG;                         // kráčí s jazykem rozhraní
+  const data = HELP[jazyk] || HELP.en;
+  const odkazy = jazyk === "cs"
+    ? "Detaily pro provoz (self-hosting, SSO, formát banky úloh) jsou v souborech docs/ v repozitáři."
+    : "Operational details (self-hosting, SSO, task bank format) live in the docs/ folder of the repository.";
+  box.innerHTML = `<div class="card">
+      <h3>${esc(data.titulek)}</h3>
+      ${data.sekce.map(([nadpis, odstavce]) => `<h4 class="tiny" style="margin-top:14px">${esc(nadpis)}</h4>
+        <ul class="tiny muted">${odstavce.map(o => `<li>${esc(o)}</li>`).join("")}</ul>`).join("")}
+      <h4 class="tiny" style="margin-top:14px">Klávesy</h4>
+      <ul class="tiny muted">${data.klavesy.map(([k, v]) => `<li><code>${esc(k)}</code> — ${esc(v)}</li>`).join("")}</ul>
+      <p class="tiny muted" style="margin-top:14px">${esc(odkazy)}</p>
+    </div>`;
+  translateDom(box);
+}
+
+/* --------------------------------------------- pohled na úlohu pro učitele */
+function kodBlock(nadpis, text, jazyk) {
+  const obsah = (text || "").trim();
+  if (!obsah) return "";
+  return `<h4 class="tiny" style="margin-top:14px">${esc(nadpis)}</h4>
+    <pre class="code tiny"${jazyk ? "" : " style=\"white-space:pre-wrap\""}>${esc(obsah)}</pre>`;
+}
+
+async function openReview(id) {
+  const starsi = document.getElementById("reviewmodal");
+  if (starsi) starsi.remove();
+  const modal = document.createElement("div");
+  modal.className = "modal"; modal.id = "reviewmodal";
+  modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true");
+  modal.innerHTML = `<div class="card" style="max-width:900px;width:min(900px,94vw);max-height:88vh;overflow:auto">
+      <h3>${esc(t("Úloha detailně"))} <code class="tiny">${esc(id)}</code></h3>
+      <p class="tiny muted">${esc(t("Lidská kontrola generované úlohy — solution i kontrolní kód jsou vidět celé."))}</p>
+      <div id="rev-obsah" class="tiny muted">${esc(t("načítám…"))}</div>
+      <div class="row end" style="margin-top:14px;flex-wrap:wrap;gap:6px">
+        <button class="ghost" id="rev-close" type="button">${esc(t("zavřít"))}</button>
+        <button class="ghost" id="rev-edit" type="button">${esc(t("upravit v editoru"))}</button>
+        <button class="ghost" id="rev-ai" type="button">${esc(t("nechat zkontrolovat modelem"))}</button>
+        <button class="primary" id="rev-run" type="button">${esc(t("ověřit spuštěním"))}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  translateDom(modal);
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+  modal.querySelector("#rev-close").onclick = () => modal.remove();
+  modal.querySelector("#rev-edit").onclick = () => { modal.remove(); upravUlohu(u); };
+
+  const d = await api(`/api/tasks/${id}/review`);
+  if (!modal.isConnected) return;            // mezitím se zavřelo nebo otevřelo jiné
+  const u = d.uloha || {};
+  const stav = { draft: t("koncept"), approved: t("schváleno"), retired: t("schováno") }[u.status] || u.status;
+  modal.querySelector("#rev-obsah").innerHTML = `
+    <div class="row" style="gap:10px;flex-wrap:wrap">
+      <span class="pill">${esc(stav)}</span>
+      <span class="tiny muted">${esc(t("lekce"))} ${u.lesson} · ${esc(t("obdrž"))} ${Number(u.level).toFixed(1)}
+        · ${(u.skills || []).join(", ")}</span>
+      <span class="tiny muted">${esc(u.source || "")}</span>
+    </div>
+    <h4 class="tiny" style="margin-top:12px">${esc(t("zadání"))}</h4>
+    <p style="white-space:pre-wrap">${esc(u.zadani || "")}</p>
+    ${u.dataset ? `<p class="tiny">dataset: <code>${esc(u.dataset)}</code>
+      ${d.nahled_dat && d.nahled_dat.stdout ? ` — <code>${esc(String(d.nahled_dat.stdout).slice(0, 400))}</code>` : ""}</p>` : ""}
+    ${kodBlock(t("startovací kostka"), u.starter, true)}
+    ${kodBlock(t("Řešení"), u.reseni, true)}
+    ${kodBlock(t("kontrolní kód"), u.check, true)}
+    <p class="tiny muted" style="margin-top:10px">${u.pokusy ? `${u.pokusy.pokusy} ${esc(t("pokusů"))}, ${u.pokusy.proselo} ${esc(t("prošlo"))}` : ""}</p>
+    <div id="rev-vysledek" style="margin-top:10px"></div>`;
+  translateDom(modal.querySelector("#rev-obsah"));
+
+  modal.querySelector("#rev-run").onclick = async () => {
+    const cil = modal.querySelector("#rev-vysledek");
+    cil.innerHTML = `<p class="tiny muted">${esc(t("spouštím v sandboxu…"))}</p>`;
+    let r;
+    try {
+      r = await api(`/api/tasks/${id}/verify`, { method: "POST", body: JSON.stringify({ schvalit: false }) });
+    } catch (e) { cil.innerHTML = `<p class="err">${esc(t("ověření se nepovedlo"))}</p>`; return; }
+    if (!modal.isConnected) return;
+    const d2 = r.detail || {};
+    cil.innerHTML = `<p class="${r.ok ? "ok" : "err"}">${r.ok ? "✓ " + esc(t("spočítáno a zkontrolováno"))
+        : "✗ " + esc((d2.duvody || []).join(", ") || t("Úloha neprošla"))}</p>
+      <ul class="tiny muted">
+        <li>${esc(t("řešení prošlo"))}: ${d2.reseni_proslo ? "✓" : "✗"} · ${esc(t("prázdný kód"))}: ${d2.prazdny_kod_prosel ? "✗ " + t("propustil kontrolu") : "✓"}
+          · ${esc(t("startovací kostka"))}: ${d2.kostka_prosel ? "✗ " + t("propustila kontrolu") : "✓"}</li>
+        ${d2.graf ? `<li>${esc(t("vykreslil graf"))}</li>` : ""}
+      </ul>
+      ${d2.vystup_reseni ? `<pre class="code tiny">${esc(String(d2.vystup_reseni).slice(0, 1200))}</pre>` : ""}
+      ${r.ok ? `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+        <button class="primary" id="rev-ok" type="button">${esc(t("schválit a pustit do nabídky"))}</button>
+        <button class="ghost" id="rev-back" type="button">${esc(t("nechat v konceptech"))}</button></div>` : ""}`;
+    translateDom(cil);
+    if (r.ok) {
+      modal.querySelector("#rev-ok").onclick = () => zmenStav(id, "approved");
+      modal.querySelector("#rev-back").onclick = () => zmenStav(id, "draft");
+    }
+  };
+
+  modal.querySelector("#rev-ai").onclick = async () => {
+    const cil = modal.querySelector("#rev-vysledek");
+    cil.innerHTML = `<p class="tiny muted">${esc(t("model přemýšlí…"))}</p>`;
+    let n;
+    try { n = await api(`/api/tasks/${id}/review-ai`, { method: "POST", body: "{}" }); }
+    catch (e) { cil.innerHTML = `<p class="err">${esc(t("model není dostupný"))}</p>`; return; }
+    if (!modal.isConnected) return;
+    if (n.chyba) cil.innerHTML = `<p class="err">${esc(String(n.chyba))}</p>`;
+    else cil.innerHTML = `<p class="${n.proslo ? "ok" : "err"}">${n.proslo ? "✓ " + esc(t("model neshledal závadu"))
+        : "✗ " + esc(t("model našel závady"))}</p>
+      ${(n.zavady || []).length ? `<ul class="tiny muted">${n.zavady.map(z => `<li>${esc(z)}</li>`).join("")}</ul>` : ""}
+      ${n["obtížnost"] ? `<p class="tiny muted">${esc(t("obtížnost"))}: ${esc(n["obtížnost"])}</p>` : ""}
+      ${n.ukázka ? `<pre class="code tiny">${esc(String(n.ukázka).slice(0, 400))}</pre>` : ""}`;
+    translateDom(cil);
+  };
+}
+
+async function zmenStav(id, status) {
+  const r = await api(`/api/tasks/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+  if (r && r.ok) { toast(t("Úloha je teď: ") + status); const m = document.getElementById("reviewmodal"); if (m) m.remove(); loadLib(); }
+  else toast((r && r.detail) || t("nepovedlo se"));
+}
+
+/* ------------------------------------------- poradce k vyberu poskytovatele */
+/* Kde se bere adresa, kde klíč a jestliobecň je klíč vůbec potřeba — aby to
+ * správce nemusel nikde hledat. Odkazy jsou jen na oficiální stránky. */
+const PROVIDER_RADCE = {
+  ollama: {
+    klic: "Vlastní Ollama klíč nepotřebuje — proto je pole prázdné a přesto to funguje.",
+    klic_vydajny: false,
+    adresa: [
+      ["Ollama na stejném stroji", "http://127.0.0.1:11434"],
+      ["Ollama na jiném stroji v síti", "http://192.168.0.x:11434"],
+    ],
+    postup: "Modely nahraješ na serveru příkazem ollama pull <model>; seznam, který tu vidíš, " +
+      "jde z adresy /api/tags.",
+    odkazy: [["Dokumentace Ollamy", "https://docs.ollama.com"]],
+  },
+  openai: {
+    klic: "Klíč musí být — bez něj brána vrátí 401. Vytvoříš ho u poskytovatele, jehož " +
+      "adrese důvěruješ.",
+    klic_vydajny: true,
+    adresa: [
+      ["OpenAI", "https://api.openai.com/v1"],
+      ["GitHub Models (Copilot)", "https://models.inference.ai.azure.com"],
+      ["Groq", "https://api.groq.com/openai/v1"],
+      ["Together AI", "https://api.together.xyz/v1"],
+      ["vlastní vLLM", "http://vlastni-server:8000/v1"],
+    ],
+    postup: "Tohle je OpenAI-kompatibilní rozhraní, takže dokud sedí adresa a klíč, je jedno, " +
+      "kdo za ním stojí. Model se jmenuje přesně tak, jak ho poskytovatel vydává.",
+    odkazy: [["OpenAI API keys", "https://platform.openai.com/api-keys"],
+             ["GitHub Models", "https://github.com/marketplace/models"],
+             ["Groq API keys", "https://console.groq.com/keys"],
+             ["Together API keys", "https://api.together.xyz/settings/api-keys"]],
+  },
+  anthropic: {
+    klic: "Klíč je povinný, posílá se hlavičkou x-api-key.",
+    klic_vydajny: true,
+    adresa: [["Anthropic", "https://api.anthropic.com"]],
+    postup: "Jméno modelu je třeba claude-sonnet-4-5; max_tokens pro kontrolu doplňuje aplikace.",
+    odkazy: [["Anthropic Console — API keys", "https://console.anthropic.com/settings/keys"]],
+  },
+  gemini: {
+    klic: "Klíč je povinný; posílá se v adrese volání, proto ho nikam dál nedávej.",
+    klic_vydajny: true,
+    adresa: [["Google Gemini", "https://generativelanguage.googleapis.com"]],
+    postup: "Modely mají verzi v názvu, např. gemini-2.5-flash; seznam se táhne z /v1beta/models.",
+    odkazy: [["Google AI Studio — Get API key", "https://aistudio.google.com/apikey"]],
+  },
+};
+
+function poradce(zkratka) {
+  return PROVIDER_RADCE[zkratka] || { klic: "", klic_vydajny: false, adresa: [], postup: "", odkazy: [] };
+}
+
+/* -------------------------------------------------- karta: Modely (admin) */
+async function renderAICard() {
+  const box = $("#adm-ai");
+  if (!box) return;
+  let a;
+  try { a = await api("/api/admin/ai"); } catch (e) { box.innerHTML = `<p class="err">${esc(t("není spojení"))}</p>`; return; }
+  const moznosti = a.moznosti || [];
+  const modely = a.modely || [];
+  const vyberModelu = (ident, hodnota) => modely.length
+    ? `<select id="${ident}">${modely.map(m => `<option value="${esc(m)}" ${m === hodnota ? "selected" : ""}>${esc(m)}</option>`).join("")}
+       ${modely.includes(hodnota) ? "" : `<option value="${esc(hodnota)}" selected>${esc(hodnota)}</option>`}</select>`
+    : `<input id="${ident}" value="${esc(hodnota || "")}" autocomplete="off" spellcheck="false"
+         placeholder="jméno modelu, např. qwen3.5:9b">`;
+  box.innerHTML = `
+    <div class="grid g2">
+      <div><label for="ai-provider">${esc(t("Poskytovatel"))}</label>
+        <select id="ai-provider">${moznosti.map(p =>
+          `<option value="${esc(p.zkratka)}" ${p.zkratka === a.poskytovatel ? "selected" : ""}>${esc(p.jmeno)}</option>`).join("")}</select></div>
+      <div><label for="ai-adresa">${esc(t("Adresa serveru (endpoint)"))}</label>
+        <input id="ai-adresa" value="${esc(a.adresa || "")}" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <div class="rada" id="ai-rada"></div>
+    <!-- pole s modely se generují, obě id jsou tahle: id="ai-model" id="ai-model-psani" -->
+    <div class="grid g2">
+      <div><label for="ai-model">${esc(t("Model pro povídání (kouč, nápovědy)"))}</label>
+        ${vyberModelu("ai-model", a.model)}</div>
+      <div><label for="ai-model-psani">${esc(t("Model pro tvorbu úloh"))}</label>
+        ${vyberModelu("ai-model-psani", a.model_psani)}</div>
+    </div>
+    <label for="ai-klic">${esc(t("API klíč"))} <span class="tiny muted" id="ai-klic-popis"></span></label>
+    <span class="pw"><input id="ai-klic" type="password" autocomplete="off"
+        placeholder="${a.klic && a.klic.nastaveno ? esc(t("uloženo: ") + a.klic.ukazka) : esc(t("vyplň, pokud ho poskytovatel vyžaduje"))}">
+      <button class="eye" type="button" data-eye="ai-klic" aria-pressed="false" title="${esc(t("ukázat"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span>
+    <p class="tiny muted">${modely.length ? `${modely.length} ${esc(t("modelů stažených na adrese výše"))}`
+      : esc(t("Seznam modelů se nezjistil — zkontroluj adresu a klíč, pak to zkus znovu."))}</p>
+    <p class="tiny muted">${a.online ? "✓ " + esc(t("model odpovídá")) : "✗ " + esc(t("model neodpovídá"))} ${esc(a.hlaska || "")}</p>
+    <p class="tiny muted" id="ai-stav" role="status"></p>
+    <div class="row" style="margin-top:10px"><button id="ai-save" class="primary" type="button">${esc(t("uložit a vyzkoušet"))}</button></div>
+    <p class="tiny muted" style="margin-top:8px">${esc(t("Volba platí pro celou instanci — uživatelé si model nevybírají. Klíč se ukládá do state/config.json (mód 600), do prohlížeče se nikdy nevrací."))}</p>`;
+  translateDom(box);
+
+  const poradenstvi = () => {
+    const zkratka = $("#ai-provider").value;
+    const r = poradce(zkratka);
+    const p = moznosti.find(x => x.zkratka === zkratka) || {};
+    $("#ai-rada").innerHTML = `
+      <p class="tiny">${esc(r.postup || p.popis || "")}</p>
+      ${r.adresa.length ? `<p class="tiny muted">${esc(t("Adresa se píše takto"))}:</p>
+        <ul class="tiny muted">${r.adresa.map(([k, v]) => `<li>${esc(k)} — <code>${esc(v)}</code></li>`).join("")}</ul>` : ""}
+      ${r.odkazy.length ? `<div class="row" style="gap:10px;flex-wrap:wrap;margin-top:4px">${
+        r.odkazy.map(([k, v]) => `<a class="tiny" href="${esc(v)}" target="_blank" rel="noopener noreferrer">${esc(k)} ↗</a>`).join("")}</div>` : ""}`;
+    const klic = $("#ai-klic");
+    const vyzaduje = !!(p.venku || r.klic_vydajny);
+    klic.required = vyzaduje;
+    $("#ai-klic-popis").textContent = vyzaduje ? "— " + t("povinný") : "— " + t("nepovinný");
+    klic.placeholder = (a.klic && a.klic.nastaveno && !klic.value)
+      ? t("uloženo: ") + a.klic.ukazka : (vyzaduje ? t("bez klíče to nefunguje") : t("nechat prázdné"));
+    // adresu vyměníme jen tehdy, je-li prázdná nebo patří jinému provideru
+    const pole_adresa = $("#ai-adresa");
+    const druha = moznosti.some(x => x.adresa === pole_adresa.value && x.zkratka !== $("#ai-provider").value);
+    if (!pole_adresa.value || druha) pole_adresa.value = p.adresa || "";
+    translateDom($("#ai-rada"));
+  };
+  $("#ai-provider").onchange = poradenstvi;
+  poradenstvi();
+
+  $("#ai-save").onclick = async () => {
+    const stav = $("#ai-stav");
+    const radek = poradce($("#ai-provider").value);
+    const klic = $("#ai-klic").value.trim();
+    const provider = moznosti.find(x => x.zkratka === $("#ai-provider").value) || {};
+    if ((provider.venku || radek.klic_vydajny) && !klic && !(a.klic && a.klic.nastaveno)) {
+      stav.className = "tiny err";
+      stav.textContent = t("Tenhle poskytovatel klíč vyžaduje — bez něj to nebude mluvit.");
+      $("#ai-klic").focus();
+      return;
+    }
+    $("#ai-save").disabled = true;
+    stav.className = "tiny muted"; stav.textContent = t("zkouším…");
+    const r = await api("/api/admin/ai", { method: "POST", body: JSON.stringify({
+      poskytovatel: $("#ai-provider").value, adresa: $("#ai-adresa").value.trim(),
+      klic: klic || undefined, model: $("#ai-model").value.trim(),
+      model_psani: $("#ai-model-psani").value.trim() }) });
+    $("#ai-save").disabled = false;
+    if (r && r.ok) {
+      stav.innerHTML = r.online
+        ? `✓ ${esc(t("uloženo, model odpovídá"))}`
+        : `✗ ${esc(t("uloženo, ale model neodpovídá"))}: ${esc(r.hlaska || "")}`;
+      toast(t("Nastavení modelu uloženo."));
+      renderAICard();
+    } else { stav.className = "tiny err"; stav.textContent = (r && r.detail) || t("nepovedlo se"); }
+  };
+}
+
+/* ----------------------------------------- karta: Přihlašování (admin) */
+const SSO_NAVOD = {
+  cs: `<p>Brána ověří člověka a teprve pak pustí požadavek sem. Řekne jméno hlavičkou
+    (výchozí <code>Remote-User</code>) a volitelně skupiny druhou hlavičkou, podle kterých
+    určí roli. Aby tu někdo nemohl poslat <code>Remote-User: reditel</code> sám, posílá se
+    ještě sdílené heslo hlavičkou <code>x-rpraxe-sso</code> — musí sedět na bráně i tady.</p>
+    <p class="tiny muted">Kde to vzít: heslo vymysli ty — stiskni <em>vygenerovat</em> nebo na
+    serveru <code>openssl rand -hex 32</code> — a <strong>stejné</strong> vepiš do nastavení
+    brány (u Caddyho jako proměnnou prostředí <code>RPRAXE_SSO_SECRET</code>).</p>
+    <pre class="code tiny">handle /r-praxe/* {
+    forward_auth authelia:9091 {
+        uri /api/verify?rd=https://auth.priklad.example
+        copy_headers Remote-User Remote-Groups
+    }
+    reverse_proxy rpraxe-app:8080 {
+        header_up Remote-User {upstream_remote-user}
+        header_up Remote-Groups {upstream_remote-groups}
+        header_up X-Rpraxe-SSO {env.RPRAXE_SSO_SECRET}
+    }
+}</pre>
+    <ul class="tiny muted">
+      <li>Brána musí <code>Remote-User</code> <strong>přepisovat</strong>, ne jen přidávat.</li>
+      <li>Ověř to: <code>curl -H 'Remote-User: kdokoliv' …/api/whoami</code> — musí hlásit odhlášení.</li>
+      <li>Heslo nepatří do URL, jen do hlavičky.</li>
+      <li>Účet se po prvním přihlášení přes bránu založí sám; heslo mu pak nastav ve Správě.</li>
+      <li>Celé povídání je v <code>docs/sso.md</code> v repozitáři.</li>
+    </ul>`,
+  en: `<p>The gateway authenticates the person and only then forwards the request. It passes the
+    user name in a header (default <code>Remote-User</code>) and optionally groups in another
+    header, which is how the role is decided. To stop anyone sending their own
+    <code>Remote-User: boss</code>, the gateway also sends a shared secret in the
+    <code>x-rpraxe-sso</code> header — it has to match on both sides.</p>
+    <p class="tiny muted">Where to get it: you invent it — press <em>generate</em> or run
+    <code>openssl rand -hex 32</code> — and put the <strong>same</strong> value into the gateway.</p>
+    <pre class="code tiny">handle /r-praxe/* {
+    forward_auth authelia:9091 {
+        uri /api/verify?rd=https://auth.example.com
+        copy_headers Remote-User Remote-Groups
+    }
+    reverse_proxy rpraxe-app:8080 {
+        header_up Remote-User {upstream_remote-user}
+        header_up Remote-Groups {upstream_remote-groups}
+        header_up X-Rpraxe-SSO {env.RPRAXE_SSO_SECRET}
+    }
+}</pre>
+    <ul class="tiny muted">
+      <li>The gateway must <strong>overwrite</strong> <code>Remote-User</code>, not just add it.</li>
+      <li>Test it: <code>curl -H 'Remote-User: anyone' …/api/whoami</code> must stay signed out.</li>
+      <li>The secret belongs in a header, never in a URL.</li>
+      <li>An account is created on first gateway login; set its password in Administration.</li>
+    </ul>`,
+};
+
+async function renderLoginCard() {
+  const box = $("#adm-login");
+  if (!box) return;
+  let l;
+  try { l = await api("/api/admin/login"); } catch (e) { box.innerHTML = `<p class="err">${esc(t("není spojení"))}</p>`; return; }
+  const skupiny = Object.entries(l.role_z_skupin || {}).map(([k, v]) => `${k}=${v}`).join("\n");
+  const jazyk = (localStorage.rpraxe && localStorage.rpraxe.lang) || "cs";
+  box.innerHTML = `
+    <label class="checkrow"><input type="checkbox" id="lg-sso" ${l.sso ? "checked" : ""}>
+      <span><strong>${esc(t("Přihlašovat přes bránu (SSO)"))}</strong><br>
+      <span class="tiny muted">${esc(l.sso ? t("zapnuto — účet se založí sám podle hlavičky")
+        : t("vypnuto — přihlašuje se heslem"))}</span></span></label>
+    <div class="grid g2">
+      <div><label for="lg-hlavka">${esc(t("Hlavička s jménem uživatele"))}</label>
+        <input id="lg-hlavka" value="${esc(l.hlavka_jmeno || "Remote-User")}" autocomplete="off" spellcheck="false"></div>
+      <div><label for="lg-hlavka-role">${esc(t("Hlavička se skupinami (pro role)"))}</label>
+        <input id="lg-hlavka-role" value="${esc(l.hlavka_role || "")}" autocomplete="off"
+               spellcheck="false" placeholder="Remote-Groups"></div>
+    </div>
+    <label for="lg-tajemstvi">${esc(t("Heslo brány (shared secret)"))}</label>
+    <span class="pw"><input id="lg-tajemstvi" type="password" autocomplete="off"
+        placeholder="${l.tajemstvi && l.tajemstvi.nastaveno ? esc(t("uloženo: ") + l.tajemstvi.ukazka) : esc(t("vygeneruj a vlož i do brány"))}">
+      <button class="eye" type="button" data-eye="lg-tajemstvi" aria-pressed="false" title="${esc(t("ukázat"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span>
+    <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
+      <button id="lg-gen" class="ghost" type="button">${esc(t("vygenerovat heslo brány"))}</button>
+      <span class="tiny muted">${esc(t("hlavička s heslem"))}: <code>${esc(l.hlavka_tajemstvi)}</code></span>
+    </div>
+    <label for="lg-skupiny">${esc(t("Skupina → role (jeden na řádek, např. pedagogove=teacher)"))}</label>
+    <textarea id="lg-skupiny" rows="3" spellcheck="false">${esc(skupiny)}</textarea>
+    <p class="tiny muted">${esc(t("účty"))}: <code>${esc((l.ucity || []).join(", "))}</code></p>
+    <p class="tiny muted">${esc(t("Co přišlo v tomto požadavku"))}: <code>${esc(JSON.stringify(l.sonda || {}))}</code></p>
+    <details class="rada"><summary>${esc(t("Jak to nastavit v bráně (Authelia, Caddy…)"))}</summary>
+      ${SSO_NAVOD[jazyk] || SSO_NAVOD.cs}</details>
+    <p class="tiny muted" id="lg-stav" role="status"></p>
+    <div class="row" style="margin-top:10px"><button id="lg-save" class="primary" type="button">${esc(t("uložit přihlašování"))}</button></div>`;
+  translateDom(box);
+  $("#lg-gen").onclick = () => {
+    const pole = $("#lg-tajemstvi");
+    pole.value = vyhheslo() + vyhheslo().slice(0, 8);
+    pole.type = "text";
+    const oko = document.querySelector('[data-eye="lg-tajemstvi"]');
+    if (oko) oko.setAttribute("aria-pressed", "true");
+    $("#lg-stav").className = "tiny muted";
+    $("#lg-stav").textContent = t("Stejné heslo vlož i do nastavení brány.");
+  };
+  $("#lg-save").onclick = async () => {
+    const stav = $("#lg-stav");
+    const map = {};
+    $("#lg-skupiny").value.split("\n").forEach(radek => {
+      const casti = radek.split("=");
+      if (casti.length === 2 && casti[0].trim()) map[casti[0].trim()] = casti[1].trim();
+    });
+    const r = await api("/api/admin/login", { method: "POST", body: JSON.stringify({
+      sso: $("#lg-sso").checked, hlavka_jmeno: $("#lg-hlavka").value.trim(),
+      hlavka_role: $("#lg-hlavka-role").value.trim(), tajemstvi: $("#lg-tajemstvi").value || undefined,
+      role_z_skupin: map }) });
+    if (r && r.ok) { toast(t("Přihlašování uloženo.")); renderLoginCard(); }
+    else { stav.className = "tiny err"; stav.textContent = (r && r.detail) || t("nepovedlo se"); }
+  };
+}
+
+/* --------------------------------------------------------------- třídy */
+let TRIDY = [], TRIDA_VYBRANA = null;
+
+async function loadTridy() {
+  const box = $("#tridy");
+  if (!box) return;
+  box.innerHTML = `<p class="tiny muted">${esc(t("načítám…"))}</p>`;
+  let d;
+  try { d = await api("/api/classes"); } catch (e) { box.innerHTML = `<p class="err">${esc(t("není spojení"))}</p>`; return; }
+  TRIDY = d.tridy || [];
+  const zaci = d.zaci || [];
+  const vyber = $("#tc-zaci");
+  if (vyber) {
+    const vybrani = new Set((TRIDY.find(k => k.id === TRIDA_VYBRANA) || {}).students || []);
+    vyber.innerHTML = zaci.map(z => `<option value="${esc(z)}" ${vybrani.has(z) ? "selected" : ""}>${esc(z)}</option>`).join("")
+      || `<option value="">${esc(t("zatím žádný studentský účet"))}</option>`;
+  }
+  box.innerHTML = TRIDY.length ? `<div class="tridy">${TRIDY.map(k => `
+      <button type="button" class="trida ${k.id === TRIDA_VYBRANA ? "on" : ""}" data-id="${esc(k.id)}">
+        <strong>${esc(k.name)}</strong>${k.cizí ? ` <span class="pill">${esc(t("cizí"))}</span>` : ""}
+        <div class="tiny muted">${esc(t("učitel"))}: ${esc(k.teacher)} · ${k.students.length} ${esc(t("žáků"))}${
+          k.note ? ` · ${esc(k.note)}` : ""}</div>
+        <div class="tiny">${k.students.length ? esc(k.students.join(", ")) : esc(t("zatím bez žáků"))}</div>
+      </button>`).join("")}</div>`
+    : `<p class="tiny muted">${esc(t("Zatím žádná třída — založ první níže."))}</p>`;
+  translateDom(box);
+  $$("#tridy .trida").forEach(klick => klick.onclick = () => {
+    TRIDA_VYBRANA = klick.dataset.id;
+    const k = TRIDY.find(x => x.id === TRIDA_VYBRANA) || {};
+    $("#tc-name").value = k.name || "";
+    $("#tc-note").value = k.note || "";
+    const vybrani = new Set(k.students || []);
+    $$("#tc-zaci option").forEach(o => { o.selected = vybrani.has(o.value); });
+    loadTridy();
+  });
+}
+
+function novaTrida() {
+  TRIDA_VYBRANA = null;
+  $("#tc-name").value = "";
+  $("#tc-note").value = "";
+  $$("#tc-zaci option").forEach(o => { o.selected = false; });
+  $("#tc-status").textContent = "";
+  loadTridy();
+  $("#tc-name").focus();
+}
+
+async function ulozTridu() {
+  const stav = $("#tc-status");
+  const zaci = $$("#tc-zaci").flatMap(sel => [...sel.selectedOptions].map(o => o.value));
+  const r = await api("/api/classes", { method: "POST", body: JSON.stringify({
+    id: TRIDA_VYBRANA, name: $("#tc-name").value.trim(),
+    poznamka: $("#tc-note").value.trim(), zaci }) });
+  if (r && r.ok) {
+    TRIDA_VYBRANA = r.trida.id;
+    stav.className = "tiny ok";
+    stav.textContent = `${t("Třída uložena")}: ${r.trida.name}`;
+    await loadTridy(); loadClass();
+  } else { stav.className = "tiny err"; stav.textContent = (r && r.detail) || t("nepovedlo se"); }
+}
+
+async function smazTridu() {
+  if (!TRIDA_VYBRANA) { $("#tc-status").textContent = t("Vyber třídu, kterou chceš smazat."); return; }
+  const jmeno = (TRIDY.find(k => k.id === TRIDA_VYBRANA) || {}).name || TRIDA_VYBRANA;
+  if (!await ptat(`${t("Smazat třídu")} ${jmeno}? ${t("Žáci zůstanou, zmizí jen sdružení.")}`, "SMAZAT")) return;
+  const r = await api(`/api/classes/${TRIDA_VYBRANA}`, { method: "DELETE" });
+  if (r && r.ok) { toast(t("Třída smazána")); novaTrida(); loadClass(); }
+  else $("#tc-status").textContent = (r && r.detail) || t("nepovedlo se");
+}
+
+/* ---------------------------------------------- správa: zálohy a obnova */
+async function renderBackupCard() {
+  const box = $("#adm-backups");
+  if (!box) return;
+  let data;
+  try { data = await api("/api/admin/backups"); } catch (e) { box.innerHTML = `<p class="err">${esc(t("není spojení"))}</p>`; return; }
+  const bk = data.prehled || {};
+  const snimky = data.snimky || [];
+  box.innerHTML = `<p class="tiny muted">${esc(t("Poslední noční záloha"))}: ${
+      bk.last && bk.last.at ? new Date(bk.last.at * 1000).toLocaleString("cs-CZ") + " → " + esc(bk.last.dest || "NAS")
+        : esc(t("zatím žádná"))}</p>
+    <div style="overflow:auto"><table id="bk-table">
+      <tr><th>${esc(t("soubor"))}</th><th>${esc(t("pokusy"))}</th><th>${esc(t("náš"))}</th><th></th></tr>
+      ${snimky.map(s => `<tr><td class="tiny">${esc(s.jmeno)}<div class="tiny muted">${
+          new Date(s.cas * 1000).toLocaleString("cs-CZ")} · ${(s.bytes / 1024).toFixed(0)} kB</div></td>
+        <td>${s.pouzitelna ? s.pokusy : "—"}</td>
+        <td>${s.pouzitelna ? s.ulohy : "—"}</td>
+        <td>${s.pouzitelna ? `<button class="ghost bk-load" data-jmeno="${esc(s.jmeno)}" type="button">${esc(t("načíst"))}</button>`
+          : `<span class="tiny err">${esc(t("nepoužitelný"))}</span>`}</td></tr>`).join("")}
+    </table></div>
+    <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px">
+      <button id="adm-backup" class="ghost" type="button">${esc(t("udělat snímek teď"))}</button>
+    </div>
+    <p class="tiny muted" id="bk-stav" role="status"></p>`;
+  translateDom(box);
+  $("#adm-backup").onclick = async () => {
+    const r = await api("/api/admin/backup", { method: "POST", body: "{}" });
+    if (r && r.ok) { toast(`${t("Snímek uložen")}: ${r.name}`); renderBackupCard(); }
+    else $("#bk-stav").textContent = (r && r.detail) || t("nepovedlo se");
+  };
+  $$("#bk-table .bk-load").forEach(tlacitko => {
+    tlacitko.onclick = () => obnovZalohu(tlacitko.dataset.jmeno);
+  });
+}
+
+async function obnovZalohu(jmeno) {
+  const odpoved = await ptat(
+    `${t("Načíst ze zálohy")} — ${jmeno}. ${t("Přepíšu databázi tímto snímkem; současná data se předtím uloží do souboru pred-obnovou-*.db.")}`,
+    t("pro jistotu napiš: OBNOVIT"));
+  if (!odpoved) return;
+  const r = await api("/api/admin/restore", { method: "POST",
+    body: JSON.stringify({ jmeno, potvrdit: String(odpoved).trim() }) });
+  if (r && r.ok) {
+    toast(`${t("Obnoveno")}: ${r.pokusy} ${t("pokusů")}, ${r.ulohy} ${t("úloh")} · ${t("pojistka")} ${r.pojistka}`);
+    renderBackupCard();
+  } else {
+    const stav = document.getElementById("bk-stav");
+    if (stav) stav.textContent = (r && r.detail) || t("nepovedlo se");
+  }
+}
+
 function show(view) {
   $$("nav button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + view));
@@ -390,6 +1057,7 @@ function show(view) {
   if (view === "sheet") loadTahak();
   if (view === "class") loadClass();
   if (view === "admin") loadAdmin();
+  if (view === "help") renderHelp();
   if (view === "today") loadBoot();
 }
 
@@ -493,12 +1161,11 @@ async function openSettings() {
   const langs = Object.entries(s.langs || { cs: "čeština" });
   fill($("#set-lang"), langs, s.lang || "cs");
   fill($("#set-min"), (s.budgets || [15, 20, 30, 45]).map(m => [m, `${m} min`]), s.minutes || 20);
-  const models = [["", t("Výchozí") + (s.default_model ? ` (${s.default_model})` : "")]]
-    .concat((s.models || []).map(m => [m, m]));
-  fill($("#set-model"), models, s.model || "");
-  $("#set-ainote").textContent = s.ai_online
-    ? `${(s.models || []).length} modelů na lokální Ollamě; data neopouštějí dům.`
-    : "Lokální model je zrovna nedostupný — kouč odpovídá z banky napověd.";
+  const ai = s.ai || {};
+  $("#set-model-info").textContent = ai.model
+    ? `${t("Model")}: ${ai.model}${ai.poskytovatel ? ` (${ai.poskytovatel})` : ""}`
+    : (s.default_model ? `${t("Model")}: ${s.default_model}` : t("Model zatím nemá nastavený správce."));
+  $("#set-ainote").textContent = t("Model volí správce — všichni v instanci mají stejného kouče.");
   $("#setmodal").hidden = false;
   $("#set-theme").focus();
 }
@@ -506,7 +1173,7 @@ async function openSettings() {
 async function saveSettings() {
   const body = {
     theme: $("#set-theme").value, lang: $("#set-lang").value,
-    model: $("#set-model").value, minutes: Number($("#set-min").value),
+    minutes: Number($("#set-min").value),
   };
   $("#set-save").disabled = true;
   let r;
@@ -519,6 +1186,7 @@ async function saveSettings() {
   if (r && r.ok) {
     SETTINGS = { ...SETTINGS, ...body };
     applyTheme(body.theme); applyLang(body.lang);
+    renderHelp();                       // nápis nápovědy patří do nového jazyka
     $("#setmodal").hidden = true;
     toast("Nastavení uložené.");
     await loadBoot();
@@ -529,6 +1197,7 @@ async function saveSettings() {
 
 /* ------------------------------------------------------------------ třída */
 async function loadClass() {
+  loadTridy();
   const box = $("#class");
   if (!box) return;
   box.innerHTML = '<p class="muted tiny">načítám…</p>';
@@ -536,7 +1205,8 @@ async function loadClass() {
   const zaci = d.students || [];
   box.innerHTML = "<tr><th>jméno</th><th>naposledy</th><th>úlohy</th><th>první dobrou</th>" +
     "<th>odklikáno</th><th>řada</th><th>slabé místa</th><th></th></tr>" + (zaci.length ? zaci.map(s => `
-      <tr><td><strong>${esc(s.user)}</strong></td>
+      <tr><td><strong>${esc(s.user)}</strong>${(s.tridy || []).length
+        ? `<div class="tiny muted">${esc(s.tridy.join(", "))}</div>` : ""}</td>
       <td class="tiny muted">${s.last ? new Date(s.last * 1000).toLocaleString("cs-CZ") : "ještě nic"}</td>
       <td>${s.passed}/${s.total}</td><td>${s.first_try_rate ?? 0} %</td>
       <td>${s.minutes_total} min</td><td>${s.streak}</td>
@@ -562,7 +1232,7 @@ async function showStudent(user) {
      <td>${esc(a.title || a.task)}</td><td>${a.ok ? "✓" : "✗"}</td></tr>`).join("");
 }
 
-async function saveTask() {
+async function saveTask(pres) {
   const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
   const body = {
     id: $("#nt-id").value.trim() || null,
@@ -576,21 +1246,39 @@ async function saveTask() {
     reseni: $("#nt-reseni").value,
     check: $("#nt-check").value,
     hints: $("#nt-hints").value.split("\n").map(s => s.trim()).filter(Boolean),
+    kontrola_ai: !!($("#nt-ai") && $("#nt-ai").checked),
+    pres: !!pres,
   };
   const st = $("#nt-status");
-  st.className = "tiny muted"; st.textContent = "ověřuji spuštěním…";
-  $("#nt-save").disabled = true;
+  st.className = "tiny muted";
+  st.textContent = body.kontrola_ai ? t("spouštím v sandboxu a nechám to číst modelem…")
+                                    : t("ověřuji spuštěním…");
+  $("#nt-save").disabled = true; if ($("#nt-force")) $("#nt-force").disabled = true;
   let r;
   try { r = await api("/api/tasks", { method: "POST", redirect401: false, body: JSON.stringify(body) }); }
-  catch (e) { r = { detail: "server nedostupný" }; }
-  $("#nt-save").disabled = false;
-  if (r && r.ok) {
-    st.className = "tiny ok"; st.textContent = `úloha ${r.id} uložena a ověřena`;
-    $("#nt-id").value = r.id; loadLib();
+  catch (e) { r = { detail: t("server nedostupný") }; }
+  $("#nt-save").disabled = false; if ($("#nt-force")) $("#nt-force").disabled = false;
+  if (r && r.ulozeno && r.ok) {
+    st.className = "tiny ok";
+    st.textContent = `${t("úloha")} ${r.id} ${t("uložena a schválena")}`;
+    $("#nt-id").value = r.id;
+  } else if (r && r.ulozeno) {
+    st.className = "tiny err";
+    st.textContent = `${t("uloženo jako koncept — studenti ji nevidí")}: ${r.zprava || ""}`;
+    $("#nt-id").value = r.id;
   } else {
     st.className = "tiny err";
-    st.textContent = (r && (r.detail || r.msg)) || "uložení se nezdařilo";
+    st.textContent = (r && (r.detail || r.zprava)) || t("uložení se nezdařilo");
   }
+  if (r && (r.model || r.detail)) {
+    const d = r.detail || {}, n = r.model || {};
+    const doplnek = [];
+    if (d.vystup_reseni) doplnek.push(t("výstup řešení") + ": " + String(d.vystup_reseni).slice(0, 300));
+    if ((n.zavady || []).length) doplnek.push(t("model:") + " " + n.zavady.join("; "));
+    if (n["obtížnost"]) doplnek.push(`${t("obtížnost")}: ${n["obtížnost"]}`);
+    if (doplnek.length) st.textContent += " — " + doplnek.join(" | ");
+  }
+  loadLib();
 }
 
 /* ------------------------------------------------------------------ správa */
@@ -622,27 +1310,11 @@ async function loadAdmin() {
   $$("#adm-users [data-newpw]").forEach(b => b.onclick = () => setNewPassword(b.dataset.newpw));
   $("#nu-role").innerHTML = u.roles.map(r => `<option>${r}</option>`).join("");
 
-  const bk = s.backups || {};
-  $("#adm-backups").innerHTML = `<p class="tiny muted">Poslední noční záloha:
-      ${bk.last && bk.last.at ? new Date(bk.last.at * 1000).toLocaleString("cs-CZ") + ` → ${esc(bk.last.dest || "NAS")}`
-                               : "zatím žádná (skript běží v noci)"}
-    </p><ul class="tiny muted">` +
-    (bk.local || []).map(f => `<li>${esc(f.name)} · ${(f.bytes / 1024).toFixed(0)} kB ·
-      ${new Date(f.mtime * 1000).toLocaleString("cs-CZ")}</li>`).join("") + "</ul>";
+  renderBackupCard();
 
-  const sso = s.sso || {};
-  $("#adm-login").innerHTML = `<p class="tiny">${sso.zapnuto ? "✓ heslo + brána" : "✓ přihlášení heslem"}</p>
-    <p class="tiny muted">${esc(sso.popis || "")}</p>` +
-    (sso.zapnuto
-      ? `<p class="tiny muted">hlavička jméno: <code>${esc(sso.hlavka_jmeno)}</code>${
-          sso.hlavka_role ? `, role: <code>${esc(sso.hlavka_role)}</code>` : ""}</p>`
-      : `<p class="tiny muted">Přihlášení přes bránu (SSO) se zapne v <code>rpraxe.env</code>:
-          <code>RPRAXE_SSO_SECRET</code> a <code>RPRAXE_SSO_HEADER</code> — pak se na přihlašovací
-          stránce objeví druhé tlačítko. Postup a vzor pro Caddy/Authelia je v <code>docs/sso.md</code>.</p>`);
+  renderLoginCard();
 
-  $("#adm-ai").innerHTML = `<p class="tiny">${s.ai_online ? "✓ model dostupný" : "✗ model nedostupný"}</p>
-    <p class="tiny muted">píše: <code>${esc(s.model_write)}</code></p>
-    <ul class="tiny muted">` + (s.models || []).map(m => `<li><code>${esc(m)}</code></li>`).join("") + "</ul>";
+  renderAICard();
 
   $("#adm-bank").innerHTML = `<p class="tiny">${s.tasks} úloh · lekce ${s.lesson_current} je aktuální</p>
     <p class="tiny muted">datasets: ${esc((s.datasets || []).slice(0, 6).join(", "))}${(s.datasets||[]).length>6?" …":""}</p>
@@ -779,7 +1451,11 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#set-cancel").onclick = () => { $("#setmodal").hidden = true; };
   $("#set-save").onclick = saveSettings;
   $("#setmodal").onclick = (e) => { if (e.target.id === "setmodal") $("#setmodal").hidden = true; };
-  $("#nt-save").onclick = saveTask;
+  $("#nt-save").onclick = () => saveTask(false);
+  if ($("#nt-force")) $("#nt-force").onclick = () => saveTask(true);
+  if ($("#tc-new")) $("#tc-new").onclick = novaTrida;
+  if ($("#tc-save")) $("#tc-save").onclick = ulozTridu;
+  if ($("#tc-del")) $("#tc-del").onclick = smazTridu;
   $("#nt-clear").onclick = () => {
     ["nt-id", "nt-title", "nt-skills", "nt-dataset", "nt-nacti", "nt-starter", "nt-zadani",
      "nt-reseni", "nt-check", "nt-hints"].forEach(id => { $("#" + id).value = ""; });
@@ -792,13 +1468,6 @@ window.addEventListener("DOMContentLoaded", () => {
     st.className = "tiny " + (r && r.ok ? "ok" : "err");
     st.textContent = r && r.ok ? `účet ${r.user} vytvořen (${r.role})` : ((r && r.detail) || "nepovedlo se");
     if (r && r.ok) { $("#nu-name").value = ""; $("#nu-pass").value = ""; loadAdmin(); }
-  };
-  $("#adm-backup").onclick = async () => {
-    const b = $("#adm-backup"); b.disabled = true; b.textContent = "tvářím snímek…";
-    const r = await api("/api/admin/backup", { method: "POST", redirect401: false });
-    b.disabled = false; b.textContent = "udělat snímek teď";
-    toast(r && r.ok ? `snímek ${r.name} (${(r.bytes / 1024).toFixed(0)} kB)` : "záloha se nezdařila");
-    loadAdmin();
   };
   $("#btn-user").onclick = (e) => {
     e.stopPropagation();

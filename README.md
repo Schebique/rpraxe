@@ -19,13 +19,20 @@ Features at a glance:
   sticking points).
 * **Machine grading** — every task ships an R checker that recomputes the
   expected value from the data; feedback describes the error, never the answer.
-* **Local AI coach** — a Socratic nudge from your own Ollama model; hand-written
-  hints stay hand-written and the model never sees the solutions.
+* **AI coach on the provider you choose** — your own Ollama, any
+  OpenAI-compatible endpoint (incl. GitHub Models), Anthropic or Google Gemini.
+  The **administrator** sets it once in the UI; users never pick a model.
+  Hand-written hints stay hand-written and the model never sees the solutions.
 * **Nightly author agent** (optional) — drafts new tasks and only publishes the
   ones that pass automated validation: the solution must pass its own checker
   and empty code must fail.
-* **Roles** — `student` (own practice), `teacher` (student progress, own tasks),
-  `admin` (accounts, models, backups).
+* **Roles** — `student` (own practice), `teacher` (student progress, task review),
+  `admin` (accounts, model provider, SSO, backups, restore).
+* **Human review of generated tasks** — *inspect* shows the assignment, starter,
+  solution and checker separately; *verify by running* proves the solution
+  passes while empty code and the starter fail; the model can also be asked to
+  criticise its own task. A human approves before students see it.
+* **In-app help** — the Help tab explains the workflow in the language you chose.
 * **Notes, cheat sheet, progress** — multi-line notes per task, per-lesson cheat
   sheet, first-try success rate, streak, skill profile, CSV export.
 * **UI languages** — čeština (source), English, slovenčina, Deutsch, polština;
@@ -69,15 +76,23 @@ Všechno se nastavuje proměnnými prostředí — kompletní komentovaný sezna
 | `RPRAXE_USERS` | `jméno:role,…` — role `student` / `teacher` / `admin` | `lenka:student` |
 | `RPRAXE_PASS_<ÚČET>` | výchozí heslo účtu (použije se jen při prvním založení) | — |
 | `RPRAXE_SECRET` | podpis session cookie (`openssl rand -hex 32`) | vygeneruje se do `state/secret.key` |
-| `RPRAXE_OLLAMA` | adresa Ollamy; prázdné = AI vypnutá | prázdné |
+| `RPRAXE_PROVIDER` | `ollama` / `openai` / `anthropic` / `gemini` | `ollama` |
+| `RPRAXE_OLLAMA` | adresa modelu (Ollama, OpenAI-kompatibilní brána…) | `http://127.0.0.1:11434` |
+| `RPRAXE_AI_KEY` | API klíč poskytovatele (nepovinný u vlastní Ollamy) — nebo ho vyplň ve správě | prázdné |
 | `RPRAXE_MODEL` / `RPRAXE_MODEL_WRITE` | model kouče / generování úloh | `qwen3.5:9b` / `qwen3.6:35b-a3b` |
 | `RPRAXE_DB`, `RPRAXE_DATASETS`, `RPRAXE_WEB`, `RPRAXE_TASKS` | cesty uvnitř kontejneru | výchozí sedí |
 | `RPRAXE_CPU_LIMIT`, `RPRAXE_WALL_LIMIT`, `RPRAXE_MEM_MB` | limity sandboxu | `20`, `30`, `1500` |
 | `RPRAXE_SSO_*` | přihlášení přes bránu, viz [docs/sso.md](docs/sso.md) | vypnuto |
 | `RPRAXE_BIND`, `RPRAXE_PORT` (v souboru `.env`) | na čem poslouchá container | `127.0.0.1:8710` |
 
-AI vrstva je nepovinná: bez Ollamy funguje zadávání, kontrola, adaptivní plán i
+AI vrstva je nepovinná: bez modelu funguje zadávání, kontrola, adaptivní plán i
 progres; kouč jen odpoví z ručně psaných nápověd.
+
+**Proměnné prostředí jsou jen výchozí hodnoty.** Provider, adresu, klíče, modely
+i přihlášení přes bránu přepneš bez restartu v menu **Správa** — ukládají se do
+`state/config.json` (mód 600). Tajemství se do prohlížeče nikdy nevrací, jen
+maskovaná ukázka. Díky tomu jde instance nasadit jinde a nastavit ji z
+prohlížeče, aniž bys sahal do spouštěcího skriptu.
 
 ## Role
 
@@ -90,13 +105,61 @@ progres; kouč jen odpoví z ručně psaných nápověd.
 Role se nastavuje v `RPRAXE_USERS` anebo v menu **Správa** (admin). Učitel
 nevidí cizí poznámky ani změnu hesla jiného uživatele — jen souhrny.
 
+## Třídy / Classes
+
+Účet může patřit do několika tříd a tříd může mít učitel kolik chce — klidně se
+stejnými žáky v ranní i odpolední skupině. Tabulky `classes` a
+`class_students` jsou v téže databázi; sdružení je jen pohled, ne vlastnictví.
+
+Učitel i správce založí třídu v záložce **Třída** (karta *Třídy*): název,
+nepovinná poznámka a výběr žáků. Uložené třídy se dají upravit i smazat —
+účty zůstanou, zmizí jen sdružení. Přehled žáků ukazuje, v jakých třídách kdo
+je. Nová instance dostane jednu **Ukázkovou třídu**, aby bylo zřejmé, jak to
+má vypadat; klidně ji přejmenuj nebo smaž.
+
 ## Nastavení a jazyky
 
 Menu uživatele → **Nastavení**: motiv (systémový / světlý / tmavý), jazyk
-rozhraní, délka denní dávky a model AI kouče (vybírá se z modelů, které má
-Ollama skutečně nahrané). Preference se drží v databázi, takže po přihlášení na
-jiném zařízení sedí stejně; motiv se aplikuje ještě před vykreslením, aby
-stránka neblikala.
+rozhraní (cs / en / sk / de / pl) a délka denní dávky. Preference se drží
+v databázi, takže po přihlášení na jiném zařízení sedí stejně; motiv se aplikuje
+ještě před vykreslením, aby stránka neblikala.
+
+**Model si uživatel nevolí** — v nastavení jen vidí, kterého kouče nasadil
+správce. Hodí se to v produkci i ve třídě: všichni mají stejné chování a
+náklady na model rozhodují na jednom místě.
+
+## Modely (volí správce)
+
+Menu **Správa → Modely** nastaví, odkud se AI bere: vlastní Ollama,
+OpenAI-kompatibilní brána (včetně GitHub Models, Groq či vLLM — jen přepíšeš
+adresu), Anthropic nebo Google Gemini, zvlášť model na povídání a na tvorbu
+úloh. Uloženo v `state/config.json` (mód 600), klíč se do prohlížeče nevrací.
+Tlačítko *uložit a vyzkoušet* rovnou napíše, jestli model odpovídá.
+Karta u každého poskytovatele řekne, jestli data opouštějí dům, kde se bere
+adresa (Ollama `http://stroj:11434`, OpenAI `https://api.openai.com/v1`, GitHub
+Models `https://models.inference.ai.azure.com`, Groq, vLLM …) a odkazy, kde
+vytvořit klíč. U poskytovatelů, kteří klíč vyžadují, je pole povinné — bez něj
+se nastavení neuloží. Jsou-li na adrese dostupné modely, nabídnou se
+v roletce; jinak se jméno napíše.
+
+## Kontrola vygenerovaných úloh
+
+Učitel i správce má v knihovně tlačítko **prozkoumat**:
+
+1. strukturovaný pohled — zadání, startovací kostka, **řešení** a kontrolní kód
+   každé zvlášť, k tomu dataset a jeho hlavička,
+2. **ověřit spuštěním** — řešení musí projít, prázdný kód a startovací kostka
+   nesmí; vidíš výstup i to, jaké knihovny sandbox nabízel,
+3. **nechat zkontrolovat modelem** — model úlohu kritizuje a může navrhnout
+   opravenou kontrolu,
+4. teprve pak **schválit a pustit do nabídky**. Koncept (`draft`) se studentům
+   nikdy neukáže.
+
+Koncept se dá i **upravit**: tlačítkem *upravit v editoru* se úloha nahraje do
+editoru. Před uložením ji aplikace sama prověře — řešení musí projít a prázdný
+kód ani startovací kostka nesmí — a volitelně ji čte i model a vyjmenuje
+nejasnosti. Když prověrka nevyjde, uložení se **odmítne** a stará verze zůstane;
+*uložit i přesto* uloží rozdělaný nápad jako koncept, který studenti nevidí.
 
 ## Zálohy
 
@@ -112,8 +175,23 @@ cp scripts/backup.sh /usr/local/bin/ && crontab -e
 # 40 3 * * * /usr/local/bin/backup.sh /mnt/nas/zalohy/rpraxe 7
 ```
 
-Obnova: `docker compose down`, nahradit `state/rpraxe.db` a rozbalit
+**Obnova ze zálohy** je i v prohlížeči: menu **Správa → Zálohy a obnova** ukáže
+snímky (včetně počtu pokusů a úloh v každém), a tlačítko *načíst* databázi
+vrátí ke zvolenému snímku. Před obnovou se vždy udělá pojistka
+`pred-obnovou-*.db` a po opsání slova `OBNOVIT` se teprve přepíše. Účty a
+hesla zůstávají v `state/users.json`, takže je obnova DB nepokazí.
+
+Ručně zvenčí: `docker compose down`, nahradit `state/rpraxe.db` a rozbalit
 `rpraxe-ucty-*.tgz` do `state/`, `docker compose up -d`.
+
+## K čemu jsou poznámky
+
+Poznámka visí na dvojici (účet, úloha) a je to **cizí slovo pro to, co si žák
+zapíše sám**: proč mu úloha nedala spát, na co si dát pozor. Není to hodnocení
+ani vzkaz — systém z ní nic neposuzuje a kouč ji nedostává. Má cenu proto, že
+za měsíc si nikdo neneše, v čem tehdy chyboval; a učitel podle nich pozná, kde
+skupina zápasí, i když počet pokusů vypadá dobře. Prázdné pole se mažou, aby
+se v nich nehromadilo nic.
 
 ## Banka úloh
 
@@ -201,7 +279,13 @@ docker compose exec app /opt/venv/bin/python /srv/scripts/validate.py
 ```
 
 Frontend se dá ověřit i bez prohlížeče přes jsdom
-([`docs/testing.md`](docs/testing.md)). Podmínky pull requestu:
+([`docs/testing.md`](docs/testing.md)) — po každé změně `web/` se to vyplatí
+spustit na běžící instanci, projde to totiž skutečným klikáním:
+
+```sh
+RPRAXE_URL=http://127.0.0.1:8710 node test/dom.mjs ondra   # správce
+RPRAXE_URL=http://127.0.0.1:8710 node test/dom.mjs lenka   # student
+``` Podmínky pull requestu:
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Licence

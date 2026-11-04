@@ -51,6 +51,10 @@ CREATE TABLE IF NOT EXISTS feedback(
   ts REAL, user TEXT, task TEXT, kind TEXT, text TEXT
 );
 CREATE TABLE IF NOT EXISTS ai_cache(key TEXT PRIMARY KEY, val TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS classes(
+  id TEXT PRIMARY KEY, name TEXT, teacher TEXT, note TEXT DEFAULT '', created REAL);
+CREATE TABLE IF NOT EXISTS class_students(
+  class TEXT, student TEXT, joined REAL, PRIMARY KEY(class, student));
 """
 
 
@@ -188,3 +192,51 @@ def user_stats(c: sqlite3.Connection, user: str, days: int = 60) -> dict:
     return {"total": tot["n"] or 0, "passed": tot["p"] or 0, "by_day": by_day, "skills": by_skill,
             "first_try_rate": round(100.0 * ft["p"] / ft["n"]) if ft["n"] else 0,
             "days_active": dayinfo["d"] or 0, "minutes_total": round(dayinfo["min"] or 0)}
+
+# ----------------------------------------------------------------- tridy
+def new_class_id(c: sqlite3.Connection) -> str:
+    n = c.execute("SELECT COUNT(*) FROM classes").fetchone()[0]
+    while True:
+        n += 1
+        kand = "tr-%02d" % n
+        if not c.execute("SELECT 1 FROM classes WHERE id=?", (kand,)).fetchone():
+            return kand
+
+
+def classes(c: sqlite3.Connection, teacher: str | None = None) -> list[dict]:
+    """Tridy i se zaky; `teacher` omezi jen na ty, ktere ten kdo vede."""
+    if teacher:
+        rows = c.execute("SELECT * FROM classes WHERE teacher=? ORDER BY name", (teacher,)).fetchall()
+    else:
+        rows = c.execute("SELECT * FROM classes ORDER BY name").fetchall()
+    out = []
+    for r in rows:
+        zaci = [x["student"] for x in c.execute(
+            "SELECT student FROM class_students WHERE class=? ORDER BY student", (r["id"],))]
+        out.append({"id": r["id"], "name": r["name"], "teacher": r["teacher"],
+                    "note": r["note"] or "", "created": r["created"], "students": zaci})
+    return out
+
+
+def save_class(c, identification: str, name: str, teacher: str,
+               note: str = "", students: list[str] | None = None) -> dict:
+    c.execute("INSERT INTO classes(id,name,teacher,note,created) VALUES(?,?,?,?,?) "
+              "ON CONFLICT(id) DO UPDATE SET name=excluded.name, teacher=excluded.teacher, "
+              "note=excluded.note", (identification, name, teacher, note, time.time()))
+    if students is not None:
+        c.execute("DELETE FROM class_students WHERE class=?", (identification,))
+        for z in dict.fromkeys(students):
+            c.execute("INSERT OR IGNORE INTO class_students(class,student,joined) VALUES(?,?,?)",
+                      (identification, z, time.time()))
+    return next((k for k in classes(c) if k["id"] == identification), {"id": identification})
+
+
+def drop_class(c, identification: str) -> None:
+    c.execute("DELETE FROM classes WHERE id=?", (identification,))
+    c.execute("DELETE FROM class_students WHERE class=?", (identification,))
+
+
+def classes_of(c, student: str) -> list[str]:
+    return [r["name"] for r in c.execute(
+        "SELECT cl.name FROM classes cl JOIN class_students cs ON cs.class=cl.id "
+        "WHERE cs.student=? ORDER BY cl.name", (student,))]

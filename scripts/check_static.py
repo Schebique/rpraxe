@@ -34,6 +34,20 @@ def mrtve_ovladaci(html: str, js: str) -> list[str]:
     return mrtva
 
 
+def chybejici_prvky(html: str, js: str) -> list[str]:
+    """Prvky, které si app.js volá a nikde nevznikly.
+
+    `$("#něco").onclick = …` na prvku, který v HTML není a ani se nedostaví,
+    hodí `Cannot set properties of null` už při startu a aplikace je pak černá
+    — proto to počítá až build, ne až první návštěvník.
+    """
+    exists = set(re.findall(r'id="([^"]+)"', html)) | set(re.findall(r'id="([^"]+)"', js))
+    exists |= set(re.findall(r'''\.id\s*=\s*["']([\w-]+)''', js))       # prvky, které JS vytvoří sám
+    nacteno = set(re.findall(r"""(?:querySelector|querySelectorAll)\(\s*[\"']#([A-Za-z][\w-]*)""", js))
+    nacteno |= set(re.findall(r"""\$\(\s*[\"']#([A-Za-z][\w-]*)""", js))
+    return [f"#{i} si app.js volá, ale nikde takový prvek není" for i in sorted(nacteno - exists)]
+
+
 def main() -> int:
     html = (WEB / "index.html").read_text(encoding="utf-8")
     refs = [m for m in re.findall(r'(?:src|href)="(/static/[^"]+)"', html)
@@ -47,14 +61,15 @@ def main() -> int:
     if "app.js" not in html:
         print("index.html nivolal zadny app.js — stranka by byla prazdna")
         return 1
-    mrtve = mrtve_ovladaci(html, (WEB / "app.js").read_text(encoding="utf-8"))
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    mrtve = mrtve_ovladaci(html, js) + chybejici_prvky(html, js)
     if mrtve:
         print(" MRTVE OVLADACI (klik na ne nic nedela):")
         for m in mrtve:
             print("  -", m)
         return 1
     print(f"staticka v poradku: {len(refs)} souboru odkazu, vsechny existuji; "
-          f"vsechna tlačítka mají obsluhu")
+          f"vsechna tlačítka mají obsluhu; všechny volané prvky existují")
     return 0
 
 

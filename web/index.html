@@ -27,6 +27,7 @@
       <button data-view="sheet">Tahák</button>
       <button data-view="class" id="nav-class" hidden>Třída</button>
       <button data-view="admin" id="nav-admin" hidden>Správa</button>
+      <button data-view="help" id="nav-help">Nápověda</button>
     </nav>
     <div class="right">
       <div class="usermenu">
@@ -142,7 +143,8 @@
       <div class="grid g2" style="margin-top:14px">
         <div class="card"><h3>Posledních 30 dní</h3><div class="spark" id="spark"></div>
           <div class="tiny muted" id="spark-lbl"></div></div>
-        <div class="card"><h3>Dovednosti (odhad úrovně)</h3><div id="skillbars"></div></div>
+        <div class="card"><h3>Dovednosti (odhad úrovně)</h3><div id="skillbars"></div>
+          <div class="tiny muted" id="skill-lbl"></div></div>
         <div class="card"><h3>Kde se to zadrhává</h3><div id="hard"></div></div>
         <div class="card"><h3>Tvoje poznámky</h3><div id="mynotes"></div>
           <p class="tiny muted">Poznámku píšeš u úlohy tlačítkem „zapsat poznámku“. Uloží se k ní
@@ -157,7 +159,25 @@
 
     <!-- ================= TŘÍDA (učitel) ================= -->
     <section class="view" id="v-class">
-      <div class="card"><h3>Žáci</h3>
+      <div class="card"><h3>Třídy</h3>
+        <div id="tridy"></div>
+        <div class="grid g2" style="margin-top:12px">
+          <div><label for="tc-name">název třídy</label>
+            <input id="tc-name" placeholder="např. Skupina A — úterý"></div>
+          <div><label for="tc-note">poznámka (nepovinná)</label><input id="tc-note"></div>
+        </div>
+        <label for="tc-zaci">žáci ve třídě</label>
+        <select id="tc-zaci" multiple size="6"></select>
+        <p class="tiny muted">Drž Ctrl (Cmd) a vyber víc účtů. Učitel může mít tříd víc a
+         téhož žáka klidně ve dvou.</p>
+        <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+          <button id="tc-new" class="ghost" type="button">začít novou třídu</button>
+          <button id="tc-save" class="primary" type="button">uložit třídu</button>
+          <button id="tc-del" class="ghost" type="button">smazat vybranou</button>
+        </div>
+        <p class="tiny" id="tc-status" role="status"></p>
+      </div>
+      <div class="card" style="margin-top:14px"><h3>Žáci</h3>
         <div style="overflow:auto"><table id="class"></table></div>
         <p class="tiny muted">Údaje jsou z tvého serveru; studenti je vidí taky, navzájem ne.</p></div>
       <div class="card" style="margin-top:14px" id="studentdetail"></div>
@@ -182,8 +202,13 @@
         <label for="nt-reseni">řešení (musí projít kontrolou)</label><textarea id="nt-reseni" rows="5"></textarea>
         <label for="nt-check">kontrola (R)</label><textarea id="nt-check" rows="5"></textarea>
         <label for="nt-hints">napovědy (jedna na řádek)</label><textarea id="nt-hints" rows="3"></textarea>
+        <label class="checkrow"><input type="checkbox" id="nt-ai" checked>
+          nechat úlohu před uložením zkontrolovat i modelem (trvá déle)</label>
+        <p class="tiny muted" id="nt-edit">Upravuješ hotovou úlohu — dokud projde řešením a neprojde
+          prázdným kódem, uložení se odmítne a původní text zůstane.</p>
         <div class="row end" style="margin-top:10px">
           <button id="nt-clear" class="ghost" type="button">vyčistit</button>
+          <button id="nt-force" class="ghost" type="button">uložit i přesto (koncept)</button>
           <button id="nt-save" class="primary" type="button">Uložit a ověřit</button>
         </div>
         <p class="tiny" id="nt-status" role="status"></p>
@@ -191,9 +216,13 @@
     </section>
 
     <!-- ================= SPRÁVA (admin) ================= -->
+    <section class="view" id="v-help">
+      <div id="help-obsah"><p class="muted tiny">načítám…</p></div>
+    </section>
+
     <section class="view" id="v-admin">
       <div class="grid g3" id="admin-kpis"></div>
-      <div class="grid g2" style="margin-top:14px">
+      <div class="adminrows">
                 <div class="card"><h3>Účty</h3><div style="overflow:auto"><table id="adm-users"></table></div>
           <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
             <input id="nu-name" placeholder="jméno účtu" autocomplete="off" style="width:140px">
@@ -208,11 +237,9 @@
             <button id="nu-add" class="ghost" type="button">přidat účet</button>
           </div>
           <p class="tiny" id="nu-status" role="status"></p></div>
-        <div class="card"><h3>Zálohy</h3><div id="adm-backups"></div>
-          <div class="row" style="margin-top:10px">
-            <button id="adm-backup" class="ghost" type="button">udělat snímek teď</button></div>
+        <div class="card"><h3>Zálohy a obnova</h3><div id="adm-backups"></div>
           <p class="tiny muted">Noční kopie na NAS dělá skript <code>rpraxe-zaloha.sh</code>;
-            tohle je ruční snímek databáze v <code>state/backups</code>.</p></div>
+            snímky tady jsou ruční a dají se načíst zpátky.</p></div>
         <div class="card"><h3>Přihlašování</h3><div id="adm-login"></div></div>
         <div class="card"><h3>AI</h3><div id="adm-ai"></div></div>
         <div class="card"><h3>Banka úloh</h3><div id="adm-bank"></div></div>
@@ -257,8 +284,8 @@
     <select id="set-lang"></select>
     <label for="set-min">Denní dávka</label>
     <select id="set-min"></select>
-    <label for="set-model">Model AI kouče</label>
-    <select id="set-model"></select>
+    <label>Model</label>
+    <p class="tiny" id="set-model-info">–</p>
     <p class="tiny muted" id="set-ainote"></p>
     <p class="err tiny" id="set-err" role="alert"></p>
     <div class="row end">

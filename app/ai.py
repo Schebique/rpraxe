@@ -13,10 +13,11 @@ import re
 
 import httpx
 
-OLLAMA = os.environ.get("RPRAXE_OLLAMA", "http://192.168.0.162:11434")
-MODEL_CHAT = os.environ.get("RPRAXE_MODEL", "qwen3.5:9b")
-MODEL_WRITE = os.environ.get("RPRAXE_MODEL_WRITE", "qwen3.6:35b-a3b")
-TIMEOUT = float(os.environ.get("RPRAXE_AI_TIMEOUT", "90"))
+from app import config as instance
+
+# Konfigurace (poskytovatel, adresa, klíč, modely) se čte za chodu z app.config —
+# správa ji mění v prohlížeči. Proměnné prostředí jsou jen výchozí hodnota, takže
+# nasazení, která je nikdy nenastavila, se chovají jako dřív.
 
 COACH_SYSTEM = """Jsi zkušená lektorka R, která doprovází začátečnici (Lenka) při denním \
 procvičování. Kurz: Zpracovávání výzkumných dat v R (RStudio, tidyverse, dplyr, ggplot2).
@@ -49,47 +50,137 @@ prostredi jako reseni, muze volat read.csv("...") znovu.
 """
 
 
-async def chat(messages: list[dict], model: str = "", temperature: float = 0.4,
-               json_mode: bool = False) -> str:
-    model = model or MODEL_CHAT
-    payload = {"model": model, "messages": messages, "stream": False,
-               "options": {"temperature": temperature, "num_ctx": 6144}}
-    if json_mode:
-        payload["format"] = "json"
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        r = await client.post(f"{OLLAMA}/api/chat", json=payload)
-        r.raise_for_status()
-        return (r.json().get("message") or {}).get("content", "").strip()
+def modely_info() -> dict:
+    """Co je právě nastavené — pro zobrazení ve správě."""
+    cfg = instance.ai_cfg()
+    return {"poskytovatel": cfg["poskytovatel"], "jmeno": instance.PROVIDERS[cfg["poskytovatel"]]["jmeno"],
+            "adresa": cfg["adresa"], "model": cfg["model"], "model_psani": cfg["model_psani"],
+            "venku": cfg["venku"], "klic": instance.mask(cfg.get("klic", ""))}
+
+
+def _vystup_ollama(data: dict) -> str:
+    return (data.get("message") or {}).get("content", "") or ""
+
+
+def _vystup_openai(data: dict) -> str:
+    choices = data.get("choices") or []
+    if not choices:
+        return ""
+    msg = choices[0].get("message") or {}
+    casti = msg.get("content")
+    if isinstance(casti, list):          # některé brány vracejí pole částí
+        casti = "".join(c.get("text", "") for c in casti if isinstance(c, dict))
+    return casti or ""
+
+
+def _vystup_anthropic(data: dict) -> str:
+    return "".join(c.get("text", "") for c in (data.get("content") or []) if isinstance(c, dict))
+
+
+def _vystup_gemini(data: dict) -> str:
+    kandidati = data.get("candidates") or []
+    if not kandidati:
+        return ""
+    casti = (kandidati[0].get("content") or {}).get("parts") or []
+    return "".join(c.get("text", "") for c in casti if isinstance(c, dict))
+
+
+def _rozeber(styl: str, messages: list[dict]) -> tuple[str, list[dict]]:
+    """System prompt má každé API jinak — sjednotíme ho do (system, zprávy)."""
+    system = "\n\n".join(m.get("content", "") for m in messages if m.get("role") == "system")
+    dalsi = [m for m in messages if m.get("role") != "system"]
+    return system, dalsi
+
+
+async def chat(messages: list[dict], model: str = "", temperature: float | None = None,
+               json_mode: bool = False, ucel: str = "chat") -> str:
+    """Pošli konverzaci do nastaveného modelu a vrať text odpovědi.
+
+    `ucel="psani"` sahá po modelu pro tvorbu úloh, jinak po tom konverzačním.
+    """
+    cfg = instance.ai_cfg()
+    model = model or (cfg["model_psani"] if ucel == "psani" else cfg["model"])
+    ladka = float(temperature if temperature is not None else os.environ.get("RPRAXE_AI_LADKA", "0.4"))
+    system, dalsi = _rozeber(cfg["styl"], messages)
+    klice = {"Content-Type": "application/json"}
+    if cfg.get("klic"):
+        klice["Authorization"] = "Bearer " + cfg["klic"]
+        klice["x-api-key"] = cfg["klic"]
+
+    if cfg["styl"] == "ollama":
+        adresu = cfg["adresa"] + "/api/chat"
+        tele = {"model": model, "messages": messages, "stream": False,
+                "options": {"temperature": ladka, "num_ctx": 6144}}
+        if json_mode:
+            tele["format"] = "json"
+        cteni = _vystup_ollama
+    elif cfg["styl"] == "anthropic":
+        adresu = cfg["adresa"] + "/v1/messages"
+        klice["anthropic-version"] = "2023-06-01"
+        tele = {"model": model, "max_tokens": 2400, "temperature": ladka, "messages": dalsi}
+        if system:
+            tele["system"] = system
+        cteni = _vystup_anthropic
+    elif cfg["styl"] == "gemini":
+        adresu = f'{cfg["adresa"]}/v1beta/models/{model}:generateContent'
+        if cfg.get("klic"):
+            adresu += "?key=" + cfg["klic"]
+        tele = {"contents": [{"role": "user" if m["role"] == "user" else "model",
+                              "parts": [{"text": m.get("content", "")}]} for m in dalsi],
+                "generationConfig": {"temperature": ladka}}
+        if system:
+            tele["systemInstruction"] = {"parts": [{"text": system}]}
+        if json_mode:
+            tele["generationConfig"]["responseMimeType"] = "application/json"
+        cteni = _vystup_gemini
+    else:                                            # openai a každá kompatibilní brána
+        adresu = cfg["adresa"].rstrip("/") + "/chat/completions"
+        tele = {"model": model, "messages": messages, "temperature": ladka}
+        if json_mode:
+            tele["response_format"] = {"type": "json_object"}
+        cteni = _vystup_openai
+
+    async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
+        r = await client.post(adresu, json=tele, headers=klice)
+        if r.status_code >= 400:
+            raise RuntimeError(f"{cfg['poskytovatel']} vrátil {r.status_code}: {r.text[:200]}")
+    return str(cteni(r.json())).strip()
 
 
 async def list_models() -> list[str]:
-    """Modely dostupné na lokální Ollamě — pro výběr v nastavení uživatele."""
+    """Modely, které poskytovatel skutečně nabízí — pro výběr ve správě."""
+    cfg = instance.ai_cfg()
+    klice = {}
+    if cfg.get("klic"):
+        klice = {"Authorization": "Bearer " + cfg["klic"], "x-api-key": cfg["klic"]}
     try:
-        async with httpx.AsyncClient(timeout=6) as client:
-            r = await client.get(f"{OLLAMA}/api/tags")
-        return sorted(m["name"] for m in r.json().get("models", []))
-    except Exception:  # noqa: BLE001
-        return []
-
-
-async def list_models() -> list[str]:
-    """Modely na lokální Ollamě — výběr v nastavení uživatele."""
-    try:
-        async with httpx.AsyncClient(timeout=6) as client:
-            r = await client.get(f"{OLLAMA}/api/tags")
-        return sorted(m["name"] for m in r.json().get("models", []))
+        async with httpx.AsyncClient(timeout=12) as client:
+            if cfg["styl"] == "ollama":
+                r = await client.get(cfg["adresa"] + "/api/tags")
+                return sorted(m["name"] for m in r.json().get("models", []))
+            if cfg["styl"] == "gemini":
+                r = await client.get(cfg["adresa"] + "/v1beta/models",
+                                     params={"key": cfg.get("klic", "")})
+                return sorted((m.get("name") or "").replace("models/", "")
+                              for m in r.json().get("models", []))
+            r = await client.get(cfg["adresa"].rstrip("/") + "/models", headers=klice)
+            data = r.json().get("data") or r.json().get("models") or []
+            return sorted(str(m.get("id") or m.get("name")) for m in data)
     except Exception:  # noqa: BLE001
         return []
 
 
 async def available() -> tuple[bool, str]:
+    cfg = instance.ai_cfg()
+    modely = await list_models()
+    if modely:
+        return True, ", ".join(modely[:8])
+    # někteří poskytovatelé seznam modelů nedají — zkusíme krátké volání
     try:
-        async with httpx.AsyncClient(timeout=6) as client:
-            r = await client.get(f"{OLLAMA}/api/tags")
-            models = [m["name"] for m in r.json().get("models", [])]
-        return True, ", ".join(models[:8])
+        odpoved = await chat([{"role": "user", "content": "Řekni jen ANO."}], temperature=0.0)
     except Exception as exc:  # noqa: BLE001
-        return False, str(exc)
+        return False, str(exc)[:200]
+    return (True, odpoved[:120]) if odpoved else (False, "model odpověděl prázdně")
 
 
 async def coach_hint(task: dict, code: str, error: str | None, check_msg: str | None,
@@ -136,7 +227,7 @@ async def generate_task(lesson: int, focus_skills: list[str], datasets: list[str
         try:
             raw = await chat([{"role": "system", "content": TASK_SYSTEM},
                               {"role": "user", "content": prompt}],
-                             model=MODEL_WRITE, temperature=0.75 + attempt * 0.15, json_mode=True)
+                             temperature=0.75 + attempt * 0.15, json_mode=True, ucel="psani")
         except Exception:  # noqa: BLE001
             continue
         data = _parse_json(raw)
@@ -159,6 +250,68 @@ async def generate_task(lesson: int, focus_skills: list[str], datasets: list[str
             data["id"] = "llm-" + re.sub(r"[^a-z0-9]+", "-", data["title"].lower())[:34].strip("-")
             return data
     return None
+
+
+REVIEW_SYSTEM = """Prohlížíš úlohu do cvičné soustavy R pro začátečníka. Hledáš jen závady; pochvaly nepíšeš. Vrať POUZE platný JSON bez ohraničení, s těmito poli:
+{"zadani_sedí": true/false, "kontrola_měří_zadání": true/false, "obtížnost": <1-5>,
+ "zavady": ["krátká věta", "..."], "opravený_check": "<R kód, jen když umíš opravit kontrolu, inak prázdný text>"}
+Závažné závady: kontrola měří něco jiného než zadání; řešení kontrolou neprojde; úloha volá data, která k dispozici nejsou; zadání je dvousmyslné; obtížnost neodpovídá lekci.
+"""
+
+
+async def review_task(task: dict) -> dict:
+    """Názor modelu k hotové úloze — pro lidské oko; rozhoduje pořád člověk.
+
+    Texty se zkrátí, aby se vešly do kontextu: model má posoudit zadání proti
+    kontrole, ne se probírat načítáním dat.
+    """
+    limity = {"title": 120, "zadani": 1600, "reseni": 2200, "check": 1600,
+              "starter": 700, "nacti": 500, "hints": 400}
+    kus = {"lesson": task.get("lesson"), "level": task.get("level"),
+           "dataset": task.get("dataset"), "skills": task.get("skills")}
+    for k, maxv in limity.items():
+        h = task.get(k)
+        if isinstance(h, list):
+            h = "; ".join(str(x) for x in h)
+        if h:
+            kus[k] = str(h)[:maxv]
+    pokusy = [{"role": "system", "content": REVIEW_SYSTEM},
+              {"role": "user", "content": json.dumps(kus, ensure_ascii=False)}]
+    surove = ""
+    for zprávy in (pokusy, _zkracene(pokusy)):
+        try:
+            surove = await chat(zprávy, temperature=0.2, json_mode=True, ucel="psani")
+        except Exception as exc:  # noqa: BLE001
+            return {"proslo": False, "chyba": str(exc)[:200], "zavady": ["model není dostupný"]}
+        data = _parse_json(surove)
+        if data:
+            break
+    if not data:
+        return {"proslo": False, "chyba": "model neodpověděl JSONem",
+                "ukázka": str(surove)[:400], "zavady": []}
+    zavady = [str(z) for z in (data.get("zavady") or []) if str(z).strip()][:8]
+    meri = bool(data.get("kontrola_měří_zadání", data.get("kontrola meri zadani")))
+    sedí = bool(data.get("zadani_sedí", True))
+    if not meri:
+        zavady.append("kontrola podle modelu neměří to, co žádá zadání")
+    if not sedí:
+        zavady.append("zadání je nejasné nebo dvousmyslné")
+    return {"proslo": meri and sedí and not zavady,
+            "obtížnost": _as_float(data.get("obtížnost"), 0.0),
+            "opravený_check": str(data.get("opravený_check") or "")[:4000],
+            "zavady": zavady}
+
+
+def _zkracene(zprávy: list[dict]) -> list[dict]:
+    """Druhý pokus bez detailů — kdyby první odpověď byla moc dlouhá na kontext."""
+    zp = [dict(zprávy[0])]
+    try:
+        data = json.loads(zprávy[1]["content"])
+        tenká = {k: data[k] for k in ("zadani", "check", "reseni") if k in data}
+        zp.append({"role": "user", "content": json.dumps(tenká, ensure_ascii=False)})
+    except (ValueError, KeyError):
+        zp.append(dict(zprávy[1]))
+    return zp
 
 
 def _parse_json(raw: str) -> dict | None:

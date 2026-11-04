@@ -1,37 +1,66 @@
 # Přihlášení přes bránu (SSO)
 
-Aplikace umí převést identitu od.authentizační brány (Authelia,
-Authentik, oauth2-proxy, Caddy forward_auth…). Heslové přihlášení zůstává
-funkční jako záloha — bránu tedy nepotřebuješ, pokud to nechceš.
+Aplikace umí převzít identitu od authetizační brány (Authelia, Authentik,
+oauth2-proxy, Caddy forward_auth…). Přihlášení heslem zůstává funkční jako
+záloha — bránu tedy nepotřebuješ, pokud ji nechceš.
+
+Nastavení je **nainstanční**: každé nasazení r-praxe si ho zapne samo v
+**Správa → Přihlašování**. Ukládá se do `state/config.json` (mód 600), ne do
+obrazu. Proměnnné prostředí slouží jako výchozí hodnota, takže dřívější
+nasazení se chovají stejně.
+
+## Kde secret vzít a jak se jmenuje
+
+V rozhraní se pole jmenuje **Heslo brány (shared secret)** — není to heslo
+uctove, ani API klíč. Je to dlouhý náhodný řetězec, který si vymyslíš ty
+(v instance na kartě *Přihlašování* tlačítkem *vygenerovat heslo brány*, nebo na
+serveru `openssl rand -hex 32`) a **stejný** vložíš do nastavení brány. Brána ho
+posílá hlavičkou `x-rpraxe-sso`; instance ho porovnává `hmac.compare_digest`.
+Protože se neposílá do prohlížeče, dá se měnit bez restartu aplikace.
+
+
+## Jedna brána před celou doménou
+
+Máš-li víc aplikací pod `*.priklad.example`, vyplatí se dát bránu před ne.
+Uživatel se přihlásí jednou a všechny aplikace se dozví jméno a skupiny:
+
+- r-praxe hlavičku přečte, účet založí a roli vezme ze skupiny,
+- další aplikace mohou postupovat stejně — `Remote-User` plus sdílené tajemství.
+
+Brána musí u každé aplikace `Remote-User` **přepisovat**, ne jen přidávat, a
+každá aplikace má vlastní tajemství — prozrazení jednoho nesmí otevřít ostatní.
 
 ## Jak to funguje
 
-Brána ověří uživatele a teprve pak pustí požadavek na aplikaci. Aplikaci
-řekne jméno a (nepovinně) roli **dvěma hlavičkami**:
+Brána ověří uživatele a teprve pak pustí požadavek na aplikaci. Řekne jí jméno
+a nepovinně skupiny hlavičkami:
 
-| hlavička | proměnná | obsah |
-|---|---|---|
-| jméno účtu | `RPRAXE_SSO_HEADER` (výchozí `Remote-User`) | `lenka` |
-| role / skupiny | `RPRAXE_SSO_ROLE_HEADER` | `teachers` → `teacher`, `admins` → `admin` |
-| tajemství | `X-Rpraxe-SSO` + `RPRAXE_SSO_SECRET` | dlouhý náhodný řetězec |
+| hlavička | výchozí název | kde se přejmenuje | obsah |
+|---|---|---|---|
+| jméno účtu | `Remote-User` | Správa → Přihlašování (`RPRAXE_SSO_HEADER`) | `lenka` |
+| skupiny / role | `Remote-Groups` | Správa → Přihlašování (`RPRAXE_SSO_ROLE_HEADER`) | `redakce,zaci` |
+| tajemství | `X-Rpraxe-SSO` | nastavení brány (`RPRAXE_SSO_SECRET`) | dlouhý náhodný řetězec |
+
+Skupiny se na role mapují ve stejném formuláři, jeden řádek na skupinu:
+`redakce=admin`, `pedagogove=teacher`. Bez mapování vznikne účet se rolí
+`student`.
 
 Bez správného tajemství se hlavičky **ignorují** — uživatel by si jinak mohl
-nasadit vlastní `Remote-User: reditel` v curlu. Tajemství se porovnává
+poslat vlastní `Remote-User: reditel` v curlu. Tajemství se porovnává
 `hmac.compare_digest` (konstantní čas).
 
-Účet se při prvním přihlášení přes bránu založí sám (jako `student`, nebo v roli
-z skupinové hlavičky). Heslo takový účet nemá; ať se dosti zpátky i bez brány,
-nastav ho admin v **Správa** → *nové heslo*.
+Účet se při prvním přihlášení přes bránu založí sám a heslo nemá. Aby se
+člověk dostal i bez brány, nastaví mu heslo správce v **Správa → Účty**.
 
-## Caddy (forward_auth s Authelia)
+## Caddy (forward_auth s Authelií)
 
 ```caddy
 handle /r-praxe/* {
     forward_auth authelia:9091 {
-        uri /api/verify?rd=https://auth.example.eu
+        uri /api/verify?rd=https://auth.priklad.example
         copy_headers Remote-User Remote-Groups Remote-Email
     }
-    reverse_proxy rpraxe-app-1:8080 {
+    reverse_proxy rpraxe-app:8080 {
         header_up Remote-User {upstream_remote-user}
         header_up Remote-Groups {upstream_remote-groups}
         header_up X-Rpraxe-SSO {env.RPRAXE_SSO_SECRET}
@@ -39,26 +68,27 @@ handle /r-praxe/* {
 }
 ```
 
-Seznam hlaviček, které brána skutečně posílá, zjisti krátkým `request_dump`
-nebo logem — názvy se u různých bran mírně liší (`Remote-User`,
-`X-Authrequest-User`, `X-Forwarded-User`). Aplikaci je řekni v
-`RPRAXE_SSO_HEADER` / `RPRAXE_SSO_ROLE_HEADER`.
+Názvy hlaviček, které tvá brána doopravdy posílá, si ověř dumpem requestu nebo
+logem — liší se (`Remote-User`, `X-Authrequest-User`, `X-Forwarded-User`).
+Do aplikace je zapíšeš ve formuláři Přihlašování; stejné okno ukáže i sondu,
+takže vidíš, jaké hlavičky přišly s tvým aktuálním požadavkem.
 
 ## Tři věci, které se pokazují nejčastěji
 
-1. **Brána neodstraní cizí `Remote-User`.** Pokud ji klient pošle sám a brána ji
-   nepřepíše, útočí jedna hlavička. Brána musí *psát*, ne jen *číst* — ověř
-   `curl -H 'Remote-User: kdokoliv' https://…/api/me` a čekай odhlášení/401.
-2. **Tajemství unikne do logu.** Nenechávej ho v URL; jde hlavičkou.
-3. **Veřejná adresa bez brány.** Pokud je aplikace dostupná přímo (např.
-   `:8710`), hlavičky nepomůžou — tajemství sice pomůže, ale jistota je
-   pouštět aplikaci jen za bránou nebo na `127.0.0.1`.
+1. **Brána neodstraní cizí `Remote-User`.** Kdyby klient poslal hlavičku sám a
+   brána ji nepřepsala, rozhoduje jedna hlavička. Ověř to:
+   `curl -H 'Remote-User: kdokoliv' https…/api/whoami` — musí hlásit odhlášení.
+2. **Tajemství unikne do logu.** Nepatří do URL, jen do hlavičky.
+3. **Aplikace je dostupná i mimo bránu.** Kdyby někdo sahal přímo na `:8710`,
+   hlavičky nepomůžou. Poušti aplikaci na `127.0.0.1`, na vnitřní rozhraní
+   nebo za bránu — a tajemství měj stejně.
 
 ## Test
 
 ```sh
-SEC=… # stejné jako v rpraxe.env
-curl -sk -H "Remote-User: pokus" -H "X-Rpraxe-SSO: $SEC" \
-     https://sve-nasazeni.example/api/me          # → {"user":"pokus","role":"student"}
-curl -sk -H "Remote-User: pokus" https://sve-nasazeni.example/api/me   # → odhlášeno
+SEC=…   # stejné tajemství, jaké nastavila brána
+curl -sk -H "Remote-User: pokus" -H "X-Rpraxe-SSO: $SEC" https://…/api/whoami
+# → {"user":"pokus","role":"student"}
+curl -sk -H "Remote-User: pokus" https://…/api/whoami
+# → odhlášeno, tajemství chybí
 ```

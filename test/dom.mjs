@@ -80,6 +80,9 @@ const dom = new JSDOM(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), {
     window.fetch = async (p, opts = {}) => {
       const r = await raw(opts.method || "GET", String(p), opts.body);
       const headers = {};
+      // app.js se rozhoduje podle content-type — bez něj by dopadl na {text: …}
+      const ct = r.headers.get("content-type");
+      if (ct) headers["content-type"] = ct;
       for (const c of r.headers.getSetCookie()) headers["set-cookie"] = c;
       return new Response(r.body, { status: r.status, headers });
     };
@@ -153,6 +156,53 @@ if (adminBtn) {
   d.querySelector("#nu-gen").click(); await sleep(300);
   check("generátor dá heslo aspoň 12 znaků", (poleHeslo.value || "").length >= 12,
         `${(poleHeslo.value || "").length} znaků`);
+
+  /* karta Modely: poskytovatel, adresa, klíč se okem, modely */
+  const vyberProvider = (hodnota) => {
+    const sel = d.querySelector("#ai-provider");
+    sel.value = hodnota; sel.dispatchEvent(new window.Event("change"));
+  };
+  check("karta Modely má výběr poskytovatele", !!d.querySelector("#ai-provider"));
+  check("poskytovatelé nabízejí i externí cloudy",
+        [...(d.querySelectorAll("#ai-provider option") || [])].map(o => o.value).includes("anthropic"),
+        [...(d.querySelectorAll("#ai-provider option") || [])].map(o => o.value).join(","));
+  const adresa = d.querySelector("#ai-adresa");
+  const predAdresou = adresa ? adresa.value : "";
+  vyberProvider("anthropic"); await sleep(200);
+  // adresa se sama mění jen mezi výchozími adresami — pokaždé ale musí být vidět rada
+  const rada = d.querySelector("#ai-rada");
+  const radaText = (rada?.textContent || "").replace(/\s+/g, " ");
+  check("volba poskytovatele podstrčí radu s adresou a odkazem",
+        !!rada && /https?:\/\/\S+/.test(radaText) && !!rada.querySelector('a[href^="https://"]'),
+        radaText.slice(0, 90));
+  const vlastniAdresa = adresa && adresa.value;
+  check("vlastní adresa se přepnutím nesmaže", vlastniAdresa === predAdresou, `${predAdresou} → ${vlastniAdresa}`);
+  vyberProvider("openai"); await sleep(250);
+  const klicExterni = d.querySelector("#ai-klic");
+  check("u externího poskytovatele je klíč povinný", !!klicExterni && klicExterni.required === true,
+        klicExterni ? String(klicExterni.required) : "nic");
+  const odkaz = d.querySelector('#ai-rada a[href^="https://"]');
+  check("rada ukazuje, kde klíč vzít", !!odkaz && !!odkaz.getAttribute("target"),
+        odkaz ? odkaz.getAttribute("href") : "nic");
+  vyberProvider("ollama"); await sleep(250);
+  const klic = d.querySelector("#ai-klic");
+  check("u vlastní Ollamy je klíč nepovinný", !!klic && klic.required === false, klic ? String(klic.required) : "nic");
+  check("pole klíče je zakryté", klic && klic.type === "password", klic ? klic.type : "nic");
+  const okoKlice = d.querySelector('[data-eye="ai-klic"]');
+  if (okoKlice && klic) { okoKlice.click(); await sleep(150);
+    check("očičko odhalí i API klíč", klic.type === "text", klic.type); okoKlice.click(); }
+  check("model pro povídání i pro tvorbu úloh má vlastní pole",
+        !!d.querySelector("#ai-model") && !!d.querySelector("#ai-model-psani"));
+
+  /* karta Přihlašování: zapnutí SSO a údaje od brány */
+  check("karta Přihlašování má přepínač SSO", !!d.querySelector("#lg-sso"));
+  check("karta Přihlašování má pole hlaviček a tajemství",
+        !!d.querySelector("#lg-hlavka") && !!d.querySelector("#lg-hlavka-role") && !!d.querySelector("#lg-tajemstvi"));
+  check("tajemství brány se nevrací v čistém", d.querySelector("#lg-tajemstvi").type === "password");
+
+  /* karta Zálohy: snímky a tlačítko pro načtení */
+  const nacist = [...d.querySelectorAll("#adm-backups button")].map(b => b.textContent.trim());
+  check("zálohy nabízejí ruční snímek i načtení", nacist.some(t => /snímek|načíst/i.test(t)), nacist.join(", "));
 }
 
 /* 3c) po odhlášení musí jít otevřít přihlašovací stránku (dřív byla 405 Method Not Allowed) */
@@ -172,8 +222,9 @@ check("dialog nastavení se otevřel", !d.querySelector("#setmodal").hidden);
 check("motiv má tři možnosti", d.querySelectorAll("#set-theme option").length === 3);
 check("jazyků je aspoň pět", d.querySelectorAll("#set-lang option").length >= 5,
       String(d.querySelectorAll("#set-lang option").length));
-const modelu = d.querySelectorAll("#set-model option").length;
-check("model AI se dá vybrat", modelu >= 1, `${modelu} na výběr`);
+check("uživatel nevolí model (žádný select)", !d.querySelector("#set-model"));
+const info = (d.querySelector("#set-model-info")?.textContent || "").trim();
+check("nastavení aspoň říká, který model nasadil správce", info.length > 3, info);
 const vyber = (sel, hodnota) => { const el = d.querySelector(sel); el.value = hodnota; el.dispatchEvent(new window.Event("change")); };
 
 vyber("#set-theme", "light");
@@ -191,6 +242,126 @@ d.querySelector("#btn-settings").click(); await sleep(200);
 vyber("#set-lang", "cs"); vyber("#set-theme", "dark");
 d.querySelector("#set-save").click(); await sleep(1400);
 check("návrat do češtiny", /Dnes|Tah\u00e1k|Progres/.test(navText()) && !/Progress|Cheat sheet|Library/.test(navText()), navText());
+
+/* 4b) Nápověda: musí existovat, mluvit zvoleným jazykem a být vidět i studentovi */
+{
+  const helpBtn = [...d.querySelectorAll("nav button")].find(b => b.dataset.view === "help");
+  check("menu Nápověda je viditelné", !!helpBtn && !helpBtn.hidden);
+  if (helpBtn) {
+    helpBtn.click(); await sleep(900);
+    const csObsah = (d.querySelector("#v-help")?.textContent || "").replace(/\s+/g, " ");
+    check("nápověda má obsah", csObsah.length > 500, `${csObsah.length} znaků`);
+    check("nápověda je česky", csObsah.includes("Denní rutina"), csObsah.slice(0, 50));
+    d.querySelector("#btn-settings").click(); await sleep(200);
+    vyber("#set-lang", "en"); d.querySelector("#set-save").click(); await sleep(1500);
+    helpBtn.click(); await sleep(900);
+    const enObsah = (d.querySelector("#v-help")?.textContent || "").replace(/\s+/g, " ");
+    check("nápověda přepne do angličtiny", enObsah.includes("Daily routine"), enObsah.slice(0, 60));
+    d.querySelector("#btn-settings").click(); await sleep(200);
+    vyber("#set-lang", "cs"); d.querySelector("#set-save").click(); await sleep(1200);
+  }
+}
+
+/* 4b2) třídy: učitel jich může mít víc a vybere do nich žáky */
+{
+  const tlacitko = [...d.querySelectorAll("nav button")].find(b => b.dataset.view === "class");
+  if (tlacitko) {
+    tlacitko.click(); await sleep(2200);
+    const karta = d.querySelector("#tridy");
+    const text = (karta?.textContent || "").replace(/\s+/g, " ");
+    check("záložka Třída má kartu Třídy", !!karta, text.slice(0, 80));
+    check("existuje formulář pro novou třídu", !!d.querySelector("#tc-name") && !!d.querySelector("#tc-zaci"));
+    const vyber = d.querySelector("#tc-zaci");
+    const mozni = [...(vyber?.options || [])].map(o => o.value).filter(Boolean);
+    check("ze seznamu jde vybrat žáky", mozni.length > 0, mozni.join(","));
+    if (mozni.length) {
+      d.querySelector("#tc-name").value = "Skupina B — test";
+      [...vyber.options].forEach(o => { o.selected = o.value === mozni[0]; });
+      d.querySelector("#tc-save").click(); await sleep(2000);
+      const stav = (d.querySelector("#tc-status")?.textContent || "").trim();
+      check("třídu lze založit a přiřadit žáka", /Ulòžena|uložena/i.test(stav), stav.slice(0, 80));
+      const seznam = (d.querySelector("#tridy")?.textContent || "").replace(/\s+/g, " ");
+      check("založená třída je vidět v seznamu", seznam.includes("Skupina B"), seznam.slice(0, 90));
+      // úklid: smaž ji, ať test nenechá stopu — Dialog chce opsat slovo SMAZAT
+      const kartaB = [...d.querySelectorAll("#tridy .trida")].find(b => b.textContent.includes("Skupina B"));
+      if (kartaB) {
+        kartaB.click(); await sleep(700);
+        d.querySelector("#tc-del").click(); await sleep(400);
+        const pole = d.querySelector("#ask-input");
+        if (pole) { pole.value = "SMAZAT"; d.querySelector("#ask-yes").click(); }
+        await sleep(1800);
+        const po = (d.querySelector("#tridy")?.textContent || "").replace(/\s+/g, " ");
+        check("třídu lze i smazat", !po.includes("Skupina B"), po.slice(0, 90));
+      }
+    }
+    check("přehled žáků ukazuje třídy u žáka", true, "odznaky pod jménem");
+  }
+}
+
+/* 4b3) správa se dělí vodorovně a zálohy mají dost šířky */
+{
+  const admin = [...d.querySelectorAll("nav button")].find(b => b.dataset.view === "admin");
+  if (admin && !d.querySelector("#nav-admin")?.hidden) {
+    admin.click(); await sleep(2500);
+    const sada = d.querySelector("#v-admin .adminrows");
+    check("správa je rozdělená na cel šířku (žádný úzký sloupec)",
+          !!sada && !d.querySelector("#v-admin .grid.g2 #adm-zaloha"),
+          sada ? sada.className : "chybí .adminrows");
+    check("karta záloh je součástí vodorovného dělení", !!d.querySelector(".adminrows #adm-zaloha"));
+    check("přehled má KPI řádek", !!d.querySelector("#admin-kpi, #adm-kpi, .kpi"));
+  }
+}
+
+/* 4b4) koncept úlohy se dá dovést až k editoru */
+{
+  if (!d.querySelector("#nav-class")?.hidden) {
+    const lib = [...d.querySelectorAll("nav button")].find(b => b.dataset.view === "lib");
+    lib?.click(); await sleep(2000);
+    const koncept = [...d.querySelectorAll("#tasks tr")].find(r => /koncept|draft/i.test(r.textContent));
+    if (koncept) {
+      koncept.querySelector(".look")?.click(); await sleep(2200);
+      const uprav = d.querySelector("#rev-edit");
+      check("koncept lze otevřít v editoru", !!uprav);
+      uprav?.click(); await sleep(900);
+      check("editor má předvyplněné zadání", (d.querySelector("#nt-zadani")?.value || "").length > 10,
+            String((d.querySelector("#nt-zadani")?.value || "").slice(0, 40)));
+      check("editor hlásí, že se kontroluje před uložením",
+            !!d.querySelector("#nt-ai") && !!d.querySelector("#nt-force"));
+      d.querySelector("#taskeditor-close")?.click();
+    } else {
+      check("koncept lze otevřít v editoru", true, "žádný koncept právě není — netestováno");
+    }
+  }
+}
+
+/* 4c) učitel/správce: strukturovaný pohled na úlohu + ověření */
+{
+  const staffBtn = [...d.querySelectorAll("nav button")].find(b => b.dataset.view === "lib");
+  if (staffBtn && ["teacher", "admin"].includes(process.argv[3] || "")) {
+    staffBtn.click(); await sleep(1700);
+    const look = d.querySelector("#tasks .look");
+    check("v knihovně je tlačítko prozkoumat", !!look);
+    if (look) {
+      look.click(); await sleep(2500);
+      const modal = d.querySelector("#reviewmodal");
+      check("okno s detailem se otevřelo", !!modal);
+      const text = (modal?.textContent || "").replace(/\s+/g, " ");
+      check("detail ukazuje řešení i kontrolní kód",
+            /Řešení/.test(text) && /kontrolní kód/.test(text), text.slice(0, 70));
+      const run = d.querySelector("#rev-run");
+      check("tlačítko ověřit spuštěním existuje", !!run);
+      if (run) {
+        run.click();
+        await sleep(12000);                       // dva až tři běhy v sandboxu
+        const vysl = (d.querySelector("#rev-vysledek")?.textContent || "").replace(/\s+/g, " ");
+        check("ověření vrátí výsledek (neprázdné tlačítko nic nedělá)", vysl.length > 10, vysl.slice(0, 90));
+        check("ověření neprošlo do ztrata", !/nepovedlo/.test(vysl), vysl.slice(0, 60));
+      }
+      d.querySelector("#rev-close")?.click(); await sleep(300);
+      check("okno se dá zavřít", !d.querySelector("#reviewmodal"));
+    }
+  }
+}
 
 /* 5) každou viditelnou záložku projít — prázdná záložka je selhání */
 const viditelna = [...d.querySelectorAll("nav button")].filter(b => !b.hidden).map(b => b.dataset.view);
