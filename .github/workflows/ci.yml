@@ -1,0 +1,61 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  banka-a-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax Pythonu
+        run: python3 -m compileall -q app runner agent scripts tasks
+
+      # obraz je R + Python; kód je v něm zapečený, takže build je zároveň
+      # první brána (Dockerfile spouští scripts/check_static.py)
+      - name: Postavit image
+        run: docker build -t rpraxe:1 .
+
+      - name: Nastartovat stack
+        run: |
+          cp rpraxe.env.example rpraxe.env
+          chmod 600 rpraxe.env
+          docker compose up -d
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8710/; then exit 0; fi
+            sleep 3
+          done
+          docker compose logs --tail 60
+          exit 1
+
+      - name: Syntetická data
+        run: docker compose exec -T app Rscript /srv/r/gen_datasets.R
+
+      - name: Ověřit banku úloh spuštěním
+        run: |
+          docker compose exec -T app /opt/venv/bin/python /srv/scripts/validate.py | tee validace.log
+          tail -1 validace.log
+
+      - name: Statická brána (odkazy a ovládání)
+        run: docker compose exec -T app /opt/venv/bin/python /srv/scripts/check_static.py
+
+      - name: Čeština bez cizích písem
+        run: |
+          ! grep -rnP '[\x{4E00}-\x{9FFF}\x{3040}-\x{30FF}\x{0400}-\x{04FF}]' \
+            --include='*.py' --include='*.js' --include='*.html' --include='*.md' .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Smoke test frontendu (jsdom)
+        working-directory: test
+        run: |
+          npm install --no-audit --no-fund
+          RPRAXE_URL=http://127.0.0.1:8710 node dom.mjs lenka
+
+      - name: Logy aplikace
+        if: failure()
+        run: docker compose logs --tail 120

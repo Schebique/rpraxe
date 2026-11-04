@@ -1,0 +1,9 @@
+# provozní data a tajemství nesmějí do repozitáře
+state/
+rpraxe.env
+.env
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/
+*.log

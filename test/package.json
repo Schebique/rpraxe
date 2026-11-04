@@ -1,0 +1,13 @@
+{
+  "name": "rpraxe-test",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Smoke test frontendu (jsdom) — bez prohlížeče",
+  "type": "module",
+  "scripts": {
+    "test": "node dom.mjs lenka"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

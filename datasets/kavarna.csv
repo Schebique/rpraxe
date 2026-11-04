@@ -1,0 +1,421 @@
+"id_objednavky","datum","hodina","pobocka","napoj","velkost","pocet_kus","cena_ks","sleva_procento","zakaznik_new","barista","hodnoceni","trzba"
+"K0001",2026-06-12,"09:30","Kralupy","caj","medium",1,51.2,0,TRUE,"Kamila",5,51.2
+"K0002",2026-05-10,"10:30","Kralupy","flat white","medium",1,62.7,0,FALSE,"Ondra",5,62.7
+"K0003",2026-04-22,"18:00","Kralupy","espresso","medium",1,40.3,0,FALSE,"Lenka",3,40.3
+"K0004",2026-06-14,"08:45","Kladno","flat white","small",3,118.5,0,FALSE,"Ondra",5,355.5
+"K0005",2026-03-25,"19:00","Kralupy","caj","medium",1,98.2,0,TRUE,"Kamila",3,98.2
+"K0006",2026-06-28,"09:30","Kladno","limonada","small",1,122.5,10,TRUE,"Lenka",4,110.2
+"K0007",2026-03-12,"11:45","Praha-Holešovice","limonada","small",1,91.4,0,FALSE,"Nena",5,91.4
+"K0008",2026-06-26,"14:00","Kralupy","limonada","medium",3,43.8,0,FALSE,"Ondra",3,131.4
+"K0009",2026-03-07,"15:30","Praha-Holešovice","cappuccino","large",2,42.6,0,FALSE,"Ondra",5,85.2
+"K0010",2026-05-26,"11:00","Kladno","limonada","large",1,69.3,0,TRUE,"Kamila",1,69.3
+"K0011",2026-06-14,"13:15","Praha-Holešovice","espresso","large",1,87.1,0,FALSE,"Petr",3,87.1
+"K0012",2026-04-07,"11:00","Kladno","flat white","small",4,66,0,FALSE,"Petr",5,264
+"K0013",2026-05-05,"14:30","Kladno","limonada","small",1,106.9,15,TRUE,"Ondra",5,90.9
+"K0014",2026-04-05,"11:30","Kralupy","flat white","small",1,76.2,10,FALSE,"Ondra",5,68.6
+"K0015",2026-06-07,"19:00","Kralupy","horka","medium",2,43.4,0,FALSE,"Nena",1,86.8
+"K0016",2026-03-05,"13:45","Kralupy","limonada","medium",2,97,0,FALSE,"Nena",5,194
+"K0017",2026-04-22,"17:15","Kladno","espresso","large",1,104.8,0,FALSE,"Nena",5,104.8
+"K0018",2026-04-22,"15:30","Kladno","caj","small",2,42.6,0,TRUE,"Lenka",1,85.2
+"K0019",2026-05-24,"15:00","Kladno","espresso","medium",2,113.9,0,TRUE,"Lenka",4,227.8
+"K0020",2026-04-24,"10:30","Kladno","caj","medium",3,99.9,0,FALSE,"Nena",5,299.7
+"K0021",2026-04-19,"14:30","Praha-Holešovice","horka","small",1,46.1,0,FALSE,"Kamila",4,46.1
+"K0022",2026-06-20,"15:45","Kralupy","flat white","medium",2,108.6,0,FALSE,"Lenka",4,217.2
+"K0023",2026-06-18,"17:45","Kralupy","horka","medium",2,82.6,0,TRUE,"Lenka",5,165.2
+"K0024",2026-05-23,"13:15","Kralupy","flat white","large",2,103,0,FALSE,"Lenka",4,206
+"K0025",2026-05-21,"16:00","Kladno","espresso","medium",1,50.4,0,FALSE,"Ondra",5,NA
+"K0026",2026-06-14,"09:00","Praha-Holešovice","horka","small",2,89.8,0,FALSE,"Petr",4,179.6
+"K0027",2026-06-16,"15:00","Praha-Holešovice","cappuccino","small",3,42.1,0,FALSE,"Lenka",2,126.3
+"K0028",2026-06-14,"11:15","Kralupy","horka","medium",1,41.1,0,TRUE,"Nena",4,41.1
+"K0029",2026-06-08,"11:45","Kladno","horka","large",1,103.3,0,FALSE,"Nena",3,103.3
+"K0030",2026-03-09,"17:45","Kralupy","espresso","small",3,97.6,0,TRUE,"Kamila",5,292.8
+"K0031",2026-06-17,"15:45","Kladno","flat white","small",1,43.3,15,TRUE,"Ondra",4,36.8
+"K0032",2026-06-03,"18:00","Kralupy","flat white","large",1,82.5,0,TRUE,"Petr",4,82.5
+"K0033",2026-05-25,"14:30","Kladno","cappuccino","medium",3,82.1,15,TRUE,"Nena",4,209.4
+"K0034",2026-03-18,"10:30","Kladno","cappuccino","small",3,64.3,0,FALSE,"Ondra",3,192.9
+"K0035",2026-06-13,"18:15","Praha-Holešovice","caj","medium",4,NA,0,FALSE,"Petr",5,168.4
+"K0036",2026-03-20,"15:30","Kladno","flat white","small",1,102.8,0,TRUE,"Nena",5,102.8
+"K0037",2026-05-17,"14:00","Praha-Holešovice","espresso","small",1,103.7,0,TRUE,"Petr",1,103.7
+"K0038",2026-05-27,"09:15","Kralupy","caj","large",2,77.8,0,FALSE,"Petr",4,155.6
+"K0039",2026-04-05,"10:45","Kralupy","cappuccino","small",1,72.9,0,FALSE,"Lenka",5,72.9
+"K0040",2026-06-02,"11:15","Kladno","flat white","medium",1,128.8,0,FALSE,"Lenka",4,128.8
+"K0041",2026-04-26,"08:30","Kralupy","cappuccino","small",3,55.6,0,TRUE,"Lenka",3,166.8
+"K0042",2026-06-05,"09:30","Kralupy","flat white","small",3,48,15,FALSE,"Kamila",4,122.4
+"K0043",2026-06-12,"12:15","Kladno","flat white","small",2,93.5,0,FALSE,"Petr",4,187
+"K0044",2026-04-13,"10:15","Kladno","horka","small",1,68.6,0,TRUE,"Lenka",5,68.6
+"K0045",2026-03-23,"11:30","Kladno","cappuccino","small",2,58.2,0,TRUE,"Kamila",4,116.4
+"K0046",2026-04-28,"07:45","Praha-Holešovice","flat white","small",1,110.5,0,TRUE,"Kamila",5,110.5
+"K0047",2026-05-17,"18:00","Kladno","espresso","small",1,62.8,0,TRUE,"Lenka",4,62.8
+"K0048",2026-03-04,"11:30","Kladno","espresso","medium",1,113.9,0,FALSE,"Ondra",2,113.9
+"K0049",2026-05-14,"14:00","Kralupy","flat white","large",1,95.3,5,FALSE,"Kamila",4,90.5
+"K0050",2026-06-12,"15:45","Kralupy","espresso","medium",1,81,0,FALSE,"Kamila",5,81
+"K0051",2026-04-01,"08:30","Kralupy","cappuccino","medium",2,72.7,0,FALSE,"Petr",3,145.4
+"K0052",2026-03-25,"17:00","Kralupy","horka","small",1,53.5,0,TRUE,"Kamila",5,53.5
+"K0053",2026-05-13,"14:45","Kladno","cappuccino","small",1,71.2,0,FALSE,"Ondra",5,71.2
+"K0054",2026-05-16,"17:00","Kralupy","cappuccino","medium",2,74.5,0,FALSE,"Lenka",4,149
+"K0055",2026-04-22,"11:30","Kladno","espresso","medium",1,47.5,0,TRUE,"Petr",4,47.5
+"K0056",2026-03-28,"11:30","Kladno","limonada","large",1,78.9,0,TRUE,"Ondra",4,78.9
+"K0057",2026-06-05,"07:45","Praha-Holešovice","espresso","medium",1,100.3,0,FALSE,"Nena",5,100.3
+"K0058",2026-05-12,"07:30","Kladno","flat white","small",2,44,15,TRUE,"Petr",2,74.8
+"K0059",2026-03-29,"19:15","Praha-Holešovice","horka","medium",2,89.2,0,FALSE,"Petr",5,178.4
+"K0060",2026-04-27,"12:45","Kralupy","horka","small",1,49.6,0,FALSE,"Lenka",4,49.6
+"K0061",2026-06-23,"15:45","Kladno","caj","small",1,92.4,0,FALSE,"Nena",3,92.4
+"K0062",2026-04-22,"11:00","Praha-Holešovice","espresso","medium",4,92.2,0,FALSE,"Ondra",3,368.8
+"K0063",2026-05-28,"17:00","Kralupy","caj","small",1,105.8,0,FALSE,"Nena",2,105.8
+"K0064",2026-04-18,"14:15","Kralupy","horka","small",1,66.5,0,FALSE,"Kamila",5,66.5
+"K0065",2026-06-27,"16:15","Kralupy","espresso","medium",1,40.8,0,TRUE,"Ondra",3,40.8
+"K0066",2026-03-15,"07:15","Kladno","cappuccino","small",1,87.6,0,FALSE,"Petr",1,87.6
+"K0067",2026-06-18,"19:30","Kladno","caj","medium",3,76.6,0,TRUE,"Lenka",5,229.8
+"K0068",2026-04-12,"11:45","Praha-Holešovice","horka","medium",2,67.1,0,TRUE,"Kamila",4,134.2
+"K0069",2026-06-24,"08:00","Kralupy","cappuccino","medium",1,76.3,0,FALSE,"Petr",4,76.3
+"K0070",2026-03-21,"18:30","Kralupy","flat white","medium",2,106.9,5,TRUE,"Nena",4,203.1
+"K0071",2026-05-18,"10:30","Kladno","cappuccino","medium",1,121.4,0,TRUE,"Nena",4,121.4
+"K0072",2026-06-28,"19:45","Praha-Holešovice","caj","small",1,46.1,10,FALSE,"Lenka",3,41.5
+"K0073",2026-06-02,"17:45","Kladno","cappuccino","small",2,104.6,0,FALSE,"Kamila",5,209.2
+"K0074",2026-05-06,"14:30","Kralupy","limonada","medium",2,59.9,0,TRUE,"Ondra",5,119.8
+"K0075",2026-05-14,"10:45","Kralupy","espresso","medium",2,105.2,0,FALSE,"Petr",5,210.4
+"K0076",2026-06-18,"08:15","Kralupy","espresso","medium",2,50.4,0,TRUE,"Ondra",3,100.8
+"K0077",2026-04-30,"19:00","Kralupy","espresso","medium",1,68,0,FALSE,"Nena",3,68
+"K0078",2026-03-02,"16:30","Praha-Holešovice","limonada","medium",1,42.3,10,FALSE,"Lenka",4,NA
+"K0079",2026-04-07,"10:30","Kralupy","caj","medium",1,43.5,0,FALSE,"Kamila",4,43.5
+"K0080",2026-03-31,"19:15","Kralupy","espresso","medium",1,119.8,5,FALSE,"Lenka",4,113.8
+"K0081",2026-04-17,"12:00","Praha-Holešovice","limonada","medium",1,105.1,0,FALSE,"Petr",4,105.1
+"K0082",2026-04-22,"12:45","Kladno","horka","small",2,73.7,0,TRUE,"Lenka",4,147.4
+"K0083",2026-04-17,"19:30","Kralupy","horka","medium",3,104,0,FALSE,"Ondra",1,312
+"K0084",2026-03-10,"15:45","Kladno","flat white","medium",2,96.5,0,FALSE,"Kamila",3,NA
+"K0085",2026-06-29,"09:00","Kralupy","cappuccino","large",1,111.8,0,FALSE,"Kamila",5,111.8
+"K0086",2026-03-31,"07:45","Kralupy","cappuccino","medium",1,66.1,0,TRUE,"Nena",3,66.1
+"K0087",2026-04-04,"17:45","Kladno","caj","large",2,58.1,15,TRUE,"Petr",4,98.8
+"K0088",2026-04-25,"07:45","Kralupy","horka","large",1,121.5,5,FALSE,"Nena",5,115.4
+"K0089",2026-05-16,"13:00","Kladno","caj","medium",3,55.2,0,FALSE,"Ondra",5,165.6
+"K0090",2026-05-06,"12:15","Kladno","caj","small",1,67.9,0,FALSE,"Lenka",5,67.9
+"K0091",2026-05-14,"09:00","Praha-Holešovice","cappuccino","medium",2,96.9,0,FALSE,"Nena",5,193.8
+"K0092",2026-03-23,"09:45","Praha-Holešovice","espresso","medium",1,108.1,5,FALSE,"Lenka",4,102.7
+"K0093",2026-05-12,"18:30","Kladno","limonada","small",1,58.6,0,FALSE,"Lenka",2,58.6
+"K0094",2026-04-27,"07:45","Kladno","horka","small",3,97.6,0,TRUE,"Lenka",3,292.8
+"K0095",2026-03-23,"19:30","Kladno","cappuccino","large",1,75.9,0,FALSE,"Lenka",4,75.9
+"K0096",2026-04-20,"15:00","Kralupy","flat white","small",1,65.9,0,TRUE,"Kamila",4,65.9
+"K0097",2026-05-26,"13:00","Kralupy","caj","small",2,100.6,0,TRUE,"Kamila",4,201.2
+"K0098",2026-04-26,"08:15","Kladno","caj","small",1,110.5,0,FALSE,"Kamila",4,110.5
+"K0099",2026-03-06,"17:00","Kralupy","horka","small",1,99.2,0,FALSE,"Kamila",4,99.2
+"K0100",2026-06-19,"15:30","Kralupy","horka","medium",1,95.4,0,FALSE,"Lenka",5,95.4
+"K0101",2026-06-08,"18:30","Kralupy","espresso","large",1,127.4,0,FALSE,"Nena",4,127.4
+"K0102",2026-04-06,"19:30","Kralupy","limonada","small",1,122.8,10,FALSE,"Lenka",5,110.5
+"K0103",2026-06-02,"09:45","Kralupy","limonada","small",1,39.2,0,FALSE,"Ondra",3,39.2
+"K0104",2026-06-08,"14:30","Kladno","flat white","medium",1,97.5,0,TRUE,"Petr",3,97.5
+"K0105",2026-04-30,"18:15","Kralupy","cappuccino","small",1,117.8,5,FALSE,"Nena",4,111.9
+"K0106",2026-05-19,"17:30","Kralupy","caj","medium",2,60.4,0,FALSE,"Petr",3,120.8
+"K0107",2026-03-04,"11:30","Kralupy","cappuccino","large",1,86.7,5,TRUE,"Nena",3,82.4
+"K0108",2026-03-05,"13:15","Kladno","flat white","small",1,102.9,0,TRUE,"Petr",3,102.9
+"K0109",2026-03-29,"09:00","Kladno","cappuccino","medium",1,93.7,0,FALSE,"Lenka",2,93.7
+"K0110",2026-05-30,"14:15","Praha-Holešovice","limonada","large",1,39.5,0,TRUE,"Petr",3,39.5
+"K0111",2026-05-26,"14:00","Kladno","caj","medium",4,67.1,0,FALSE,"Kamila",1,268.4
+"K0112",2026-05-02,"08:15","Kralupy","caj","medium",3,111.9,0,TRUE,"Nena",3,335.7
+"K0113",2026-06-07,"09:15","Kladno","cappuccino","small",2,61,5,FALSE,"Nena",3,115.9
+"K0114",2026-05-18,"14:15","Kralupy","flat white","medium",1,126,0,TRUE,"Ondra",3,126
+"K0115",2026-04-16,"12:45","Kralupy","horka","medium",2,81.3,15,TRUE,"Lenka",5,138.2
+"K0116",2026-06-09,"19:00","Kladno","flat white","medium",1,84.7,10,TRUE,"Ondra",5,76.2
+"K0117",2026-05-10,"15:45","Kralupy","horka","large",1,60.2,0,FALSE,"Petr",5,60.2
+"K0118",2026-06-12,"15:00","Kralupy","limonada","medium",1,88.6,0,TRUE,"Petr",3,88.6
+"K0119",2026-03-05,"12:00","Kladno","flat white","medium",1,104.4,0,FALSE,"Lenka",3,104.4
+"K0120",2026-03-21,"12:15","Kralupy","cappuccino","large",4,124.2,0,FALSE,"Ondra",4,496.8
+"K0121",2026-06-04,"18:00","Kralupy","cappuccino","medium",2,51.4,0,FALSE,"Petr",5,102.8
+"K0122",2026-05-01,"17:45","Kralupy","espresso","small",1,94.9,0,FALSE,"Petr",4,94.9
+"K0123",2026-03-26,"10:00","Kralupy","caj","medium",1,87,15,FALSE,"Ondra",5,74
+"K0124",2026-06-07,"16:30","Kladno","caj","medium",1,79.5,0,TRUE,"Kamila",4,NA
+"K0125",2026-03-02,"10:30","Kladno","cappuccino","medium",4,85.5,5,FALSE,"Kamila",5,NA
+"K0126",2026-03-05,"14:30","Praha-Holešovice","horka","medium",2,94,0,FALSE,"Lenka",5,188
+"K0127",2026-06-21,"10:45","Kladno","cappuccino","large",1,120.2,0,FALSE,"Petr",5,120.2
+"K0128",2026-04-13,"13:00","Kralupy","espresso","large",2,77.9,10,FALSE,"Kamila",5,140.2
+"K0129",2026-06-14,"09:30","Kladno","espresso","small",1,76.6,0,FALSE,"Nena",4,76.6
+"K0130",2026-04-29,"09:00","Praha-Holešovice","cappuccino","medium",1,123.3,15,FALSE,"Kamila",5,104.8
+"K0131",2026-05-31,"18:30","Kladno","espresso","small",4,117.4,0,FALSE,"Petr",4,469.6
+"K0132",2026-03-28,"07:45","Kladno","espresso","medium",1,122.9,0,FALSE,"Nena",4,122.9
+"K0133",2026-05-26,"15:15","Kralupy","espresso","medium",1,104.5,0,TRUE,"Ondra",4,104.5
+"K0134",2026-04-04,"19:45","Kralupy","caj","medium",2,122.9,0,TRUE,"Kamila",4,245.8
+"K0135",2026-05-18,"09:30","Praha-Holešovice","flat white","small",1,60.6,0,TRUE,"Ondra",1,60.6
+"K0136",2026-04-30,"13:30","Kladno","flat white","small",1,121.4,0,TRUE,"Petr",4,121.4
+"K0137",2026-05-24,"08:30","Praha-Holešovice","limonada","medium",1,79.9,0,FALSE,"Nena",5,79.9
+"K0138",2026-03-18,"09:30","Kralupy","flat white","large",1,39.9,0,FALSE,"Lenka",4,39.9
+"K0139",2026-06-17,"09:15","Praha-Holešovice","espresso","small",3,44.7,0,TRUE,"Nena",2,134.1
+"K0140",2026-05-22,"18:45","Kralupy","espresso","medium",2,120.5,10,FALSE,"Ondra",5,216.9
+"K0141",2026-05-23,"18:00","Kladno","flat white","medium",1,88.9,0,FALSE,"Petr",3,88.9
+"K0142",2026-05-25,"13:00","Praha-Holešovice","cappuccino","medium",1,42.3,0,TRUE,"Lenka",4,42.3
+"K0143",2026-05-21,"10:00","Praha-Holešovice","limonada","small",1,89.8,0,TRUE,"Nena",4,89.8
+"K0144",2026-04-16,"08:15","Praha-Holešovice","cappuccino","small",1,82.6,0,TRUE,"Kamila",4,82.6
+"K0145",2026-03-11,"14:45","Praha-Holešovice","caj","medium",1,41.3,0,TRUE,"Nena",4,41.3
+"K0146",2026-03-20,"11:30","Praha-Holešovice","espresso","medium",1,112.8,0,FALSE,"Kamila",4,112.8
+"K0147",2026-04-02,"18:15","Kralupy","flat white","large",1,73.1,0,FALSE,"Lenka",4,73.1
+"K0148",2026-03-27,"17:15","Kladno","flat white","small",2,89.4,0,FALSE,"Kamila",5,178.8
+"K0149",2026-04-26,"16:30","Kralupy","horka","medium",1,87.6,0,FALSE,"Kamila",1,87.6
+"K0150",2026-05-16,"08:45","Kralupy","cappuccino","large",1,99.5,15,FALSE,"Lenka",4,84.6
+"K0151",2026-06-17,"11:15","Praha-Holešovice","flat white","medium",2,116.2,0,FALSE,"Petr",4,232.4
+"K0152",2026-06-23,"19:00","Praha-Holešovice","espresso","large",4,85.6,10,FALSE,"Kamila",3,308.2
+"K0153",2026-06-13,"16:15","Kladno","cappuccino","large",1,89.2,0,FALSE,"Petr",1,89.2
+"K0154",2026-06-10,"11:30","Praha-Holešovice","flat white","medium",1,120.2,0,FALSE,"Lenka",3,120.2
+"K0155",2026-06-18,"07:15","Praha-Holešovice","horka","large",3,71.7,0,FALSE,"Nena",2,215.1
+"K0156",2026-05-27,"07:15","Kralupy","flat white","medium",2,53.7,0,FALSE,"Kamila",4,107.4
+"K0157",2026-05-06,"12:15","Kralupy","espresso","small",1,67.1,0,TRUE,"Petr",3,NA
+"K0158",2026-04-05,"09:30","Kladno","horka","medium",4,43.8,0,FALSE,"Ondra",3,175.2
+"K0159",2026-03-04,"19:30","Kralupy","limonada","small",1,125.1,0,TRUE,"Ondra",4,125.1
+"K0160",2026-05-26,"16:45","Kladno","cappuccino","medium",1,125.4,0,FALSE,"Petr",4,125.4
+"K0161",2026-03-29,"11:30","Kralupy","limonada","small",3,113.1,0,FALSE,"Nena",5,339.3
+"K0162",2026-06-22,"17:00","Kladno","caj","small",1,103.3,0,FALSE,"Lenka",3,103.3
+"K0163",2026-03-23,"09:15","Kladno","flat white","medium",2,56.6,0,FALSE,"Ondra",4,113.2
+"K0164",2026-06-21,"19:30","Kladno","caj","medium",2,118.4,0,FALSE,"Kamila",5,236.8
+"K0165",2026-03-17,"09:30","Praha-Holešovice","limonada","small",2,102.5,0,TRUE,"Lenka",4,205
+"K0166",2026-04-22,"11:00","Kralupy","flat white","medium",1,53.6,0,TRUE,"Petr",4,53.6
+"K0167",2026-04-04,"11:15","Praha-Holešovice","cappuccino","medium",1,77,0,FALSE,"Ondra",3,77
+"K0168",2026-05-11,"11:00","Kladno","caj","small",1,116.9,0,FALSE,"Petr",5,116.9
+"K0169",2026-03-04,"07:45","Kladno","cappuccino","small",1,48.9,0,TRUE,"Nena",5,48.9
+"K0170",2026-06-23,"11:00","Kralupy","flat white","medium",1,90,10,FALSE,"Nena",4,81
+"K0171",2026-04-04,"07:00","Kladno","espresso","large",1,95.6,0,TRUE,"Petr",3,95.6
+"K0172",2026-06-27,"11:00","Kralupy","cappuccino","large",1,NA,10,FALSE,"Nena",4,76
+"K0173",2026-03-10,"11:45","Kralupy","flat white","medium",2,79,0,FALSE,"Nena",4,158
+"K0174",2026-03-27,"16:45","Kralupy","espresso","medium",1,127.4,0,FALSE,"Petr",5,127.4
+"K0175",2026-05-30,"15:45","Kralupy","espresso","large",1,99.4,10,FALSE,"Lenka",4,89.5
+"K0176",2026-06-26,"14:00","Kladno","espresso","small",1,94.7,0,TRUE,"Ondra",3,94.7
+"K0177",2026-05-02,"17:15","Kladno","caj","large",1,115.2,0,TRUE,"Nena",5,115.2
+"K0178",2026-04-08,"17:45","Kralupy","cappuccino","medium",1,70.2,15,FALSE,"Lenka",1,59.7
+"K0179",2026-06-05,"18:45","Kralupy","cappuccino","small",1,124.3,0,FALSE,"Lenka",5,124.3
+"K0180",2026-04-19,"09:00","Kralupy","horka","large",1,89.6,0,TRUE,"Nena",5,NA
+"K0181",2026-03-07,"07:00","Kladno","horka","small",1,63.4,5,FALSE,"Ondra",3,60.2
+"K0182",2026-05-07,"09:45","Kralupy","cappuccino","medium",2,49,15,TRUE,"Petr",3,83.3
+"K0183",2026-06-10,"07:30","Praha-Holešovice","flat white","small",1,46.3,10,TRUE,"Ondra",4,41.7
+"K0184",2026-06-10,"17:00","Kralupy","cappuccino","medium",2,83,0,FALSE,"Petr",3,166
+"K0185",2026-06-25,"13:30","Kralupy","horka","medium",2,110.4,0,TRUE,"Nena",4,220.8
+"K0186",2026-04-11,"07:15","Kralupy","cappuccino","medium",1,84.4,5,FALSE,"Ondra",2,80.2
+"K0187",2026-05-08,"13:45","Kladno","horka","small",1,72.6,0,FALSE,"Petr",3,72.6
+"K0188",2026-05-04,"10:00","Praha-Holešovice","flat white","large",1,121.8,0,FALSE,"Kamila",5,121.8
+"K0189",2026-05-28,"09:15","Kladno","cappuccino","small",3,98.5,15,FALSE,"Nena",5,251.2
+"K0190",2026-04-10,"18:30","Kralupy","caj","large",1,69.1,0,TRUE,"Lenka",2,69.1
+"K0191",2026-04-08,"17:30","Kralupy","espresso","small",1,60.9,0,FALSE,"Petr",5,60.9
+"K0192",2026-04-12,"19:00","Kladno","cappuccino","large",3,81.6,0,FALSE,"Lenka",4,244.8
+"K0193",2026-05-25,"18:00","Kralupy","horka","large",1,123.5,10,TRUE,"Ondra",5,111.2
+"K0194",2026-05-29,"16:30","Kladno","cappuccino","small",1,100.4,0,FALSE,"Nena",4,NA
+"K0195",2026-05-20,"19:15","Kralupy","cappuccino","medium",1,112.7,0,FALSE,"Kamila",4,112.7
+"K0196",2026-06-11,"11:15","Praha-Holešovice","limonada","small",1,106.8,0,TRUE,"Ondra",4,106.8
+"K0197",2026-04-12,"07:45","Kralupy","flat white","medium",1,106.2,0,FALSE,"Petr",5,106.2
+"K0198",2026-03-25,"12:30","Kladno","flat white","medium",3,56,15,TRUE,"Ondra",5,142.8
+"K0199",2026-03-05,"10:15","Praha-Holešovice","limonada","small",2,54.9,0,FALSE,"Lenka",5,109.8
+"K0200",2026-03-26,"08:45","Praha-Holešovice","espresso","large",1,NA,0,FALSE,"Ondra",5,94.1
+"K0201",2026-04-15,"17:45","Praha-Holešovice","cappuccino","small",1,60.3,0,FALSE,"Petr",5,60.3
+"K0202",2026-03-30,"10:00","Kladno","flat white","medium",2,96.5,0,FALSE,"Kamila",5,193
+"K0203",2026-03-20,"14:45","Kralupy","espresso","small",1,105.2,0,FALSE,"Nena",3,105.2
+"K0204",2026-03-02,"07:45","Kralupy","flat white","medium",2,78.3,0,FALSE,"Petr",5,156.6
+"K0205",2026-04-24,"14:15","Kladno","espresso","medium",2,104.8,0,FALSE,"Lenka",5,209.6
+"K0206",2026-06-21,"19:45","Kralupy","caj","medium",1,114.4,0,FALSE,"Lenka",2,114.4
+"K0207",2026-04-15,"15:30","Kladno","cappuccino","medium",1,120.5,0,FALSE,"Petr",4,120.5
+"K0208",2026-05-13,"19:15","Kralupy","flat white","large",2,78.3,0,FALSE,"Ondra",3,NA
+"K0209",2026-06-07,"12:15","Kralupy","limonada","medium",1,97.8,10,FALSE,"Lenka",5,88
+"K0210",2026-04-08,"07:00","Kralupy","cappuccino","small",2,79.6,10,FALSE,"Ondra",3,143.3
+"K0211",2026-06-01,"17:00","Kladno","espresso","medium",3,44.5,0,FALSE,"Ondra",3,133.5
+"K0212",2026-04-25,"09:30","Kladno","flat white","large",1,106.7,0,TRUE,"Petr",4,106.7
+"K0213",2026-06-01,"08:00","Praha-Holešovice","cappuccino","large",1,106.8,0,FALSE,"Ondra",5,106.8
+"K0214",2026-06-05,"12:30","Kralupy","cappuccino","medium",2,76.7,0,FALSE,"Petr",4,153.4
+"K0215",2026-05-11,"15:00","Kladno","limonada","medium",1,88.7,0,TRUE,"Petr",4,88.7
+"K0216",2026-06-13,"12:00","Kralupy","flat white","large",1,105.8,0,FALSE,"Kamila",2,105.8
+"K0217",2026-03-24,"14:30","Praha-Holešovice","cappuccino","medium",2,88.1,0,FALSE,"Kamila",5,176.2
+"K0218",2026-05-24,"12:15","Kladno","caj","medium",1,69.6,0,FALSE,"Nena",3,69.6
+"K0219",2026-03-08,"18:00","Kladno","espresso","small",1,90,0,FALSE,"Kamila",3,90
+"K0220",2026-04-23,"11:45","Kladno","caj","large",1,104.1,0,FALSE,"Petr",5,104.1
+"K0221",2026-04-21,"14:45","Kladno","cappuccino","medium",2,56.3,10,FALSE,"Ondra",5,101.3
+"K0222",2026-05-03,"14:00","Kralupy","horka","medium",4,81.2,0,FALSE,"Kamila",1,324.8
+"K0223",2026-05-23,"12:30","Kralupy","cappuccino","medium",1,98.1,0,FALSE,"Lenka",4,98.1
+"K0224",2026-05-07,"16:30","Kladno","horka","large",1,52,0,FALSE,"Petr",2,52
+"K0225",2026-03-02,"14:00","Kladno","espresso","small",2,52.4,0,FALSE,"Lenka",4,104.8
+"K0226",2026-04-28,"14:30","Kralupy","espresso","small",1,127.6,0,FALSE,"Nena",4,127.6
+"K0227",2026-03-11,"16:45","Kralupy","flat white","small",3,82.6,0,FALSE,"Nena",3,247.8
+"K0228",2026-06-21,"11:15","Kladno","cappuccino","medium",1,79.7,15,FALSE,"Nena",5,67.7
+"K0229",2026-03-19,"09:15","Praha-Holešovice","horka","large",2,69.8,0,FALSE,"Nena",3,139.6
+"K0230",2026-04-28,"11:30","Praha-Holešovice","espresso","small",4,98.6,0,FALSE,"Nena",1,394.4
+"K0231",2026-03-12,"17:45","Kladno","limonada","medium",4,72.7,0,TRUE,"Nena",4,290.8
+"K0232",2026-06-03,"14:30","Kralupy","caj","medium",2,101.2,0,TRUE,"Nena",1,202.4
+"K0233",2026-06-10,"17:30","Kralupy","limonada","medium",1,104.1,5,TRUE,"Lenka",3,98.9
+"K0234",2026-04-09,"12:30","Kladno","horka","small",2,119.7,0,FALSE,"Nena",5,239.4
+"K0235",2026-04-01,"15:00","Praha-Holešovice","caj","medium",1,107.4,0,FALSE,"Lenka",5,107.4
+"K0236",2026-03-28,"07:30","Kladno","horka","medium",1,121,0,FALSE,"Nena",4,121
+"K0237",2026-04-28,"13:00","Kladno","cappuccino","large",1,107.7,0,TRUE,"Nena",4,107.7
+"K0238",2026-04-28,"13:30","Praha-Holešovice","espresso","medium",1,67.1,0,FALSE,"Kamila",5,67.1
+"K0239",2026-04-23,"09:45","Kralupy","limonada","small",1,63.4,5,FALSE,"Nena",5,60.2
+"K0240",2026-05-23,"10:15","Kladno","espresso","medium",1,122.3,0,TRUE,"Nena",4,122.3
+"K0241",2026-06-19,"10:00","Kladno","espresso","small",1,70.5,0,TRUE,"Petr",5,70.5
+"K0242",2026-06-09,"19:45","Kralupy","cappuccino","medium",1,81.7,0,FALSE,"Petr",4,81.7
+"K0243",2026-03-16,"14:15","Praha-Holešovice","horka","small",1,71,0,FALSE,"Lenka",5,71
+"K0244",2026-04-19,"17:30","Praha-Holešovice","flat white","large",1,95.5,0,FALSE,"Lenka",4,95.5
+"K0245",2026-04-16,"08:30","Praha-Holešovice","espresso","small",1,124.9,0,FALSE,"Petr",4,124.9
+"K0246",2026-03-27,"10:15","Kralupy","limonada","medium",1,74.6,15,FALSE,"Ondra",5,63.4
+"K0247",2026-06-14,"12:15","Praha-Holešovice","caj","small",2,113,0,FALSE,"Petr",4,226
+"K0248",2026-04-13,"16:00","Praha-Holešovice","limonada","medium",1,86.5,0,TRUE,"Lenka",4,86.5
+"K0249",2026-03-19,"15:30","Kladno","cappuccino","small",3,41.6,5,FALSE,"Lenka",3,118.6
+"K0250",2026-06-02,"07:45","Kladno","limonada","medium",2,107.6,0,FALSE,"Ondra",4,215.2
+"K0251",2026-03-06,"07:00","Kladno","horka","large",1,47.4,0,FALSE,"Petr",5,47.4
+"K0252",2026-04-06,"17:15","Praha-Holešovice","espresso","small",3,58.5,0,TRUE,"Petr",5,175.5
+"K0253",2026-04-05,"11:30","Kralupy","limonada","large",1,112.1,0,FALSE,"Kamila",2,112.1
+"K0254",2026-05-08,"15:30","Kladno","caj","small",2,116.7,0,TRUE,"Ondra",4,233.4
+"K0255",2026-05-20,"19:00","Kladno","limonada","medium",1,93.5,0,FALSE,"Lenka",5,93.5
+"K0256",2026-03-03,"15:45","Kralupy","limonada","small",2,68.4,0,TRUE,"Lenka",4,136.8
+"K0257",2026-06-08,"12:30","Kladno","cappuccino","small",1,43.6,0,TRUE,"Nena",4,43.6
+"K0258",2026-06-28,"09:00","Kralupy","cappuccino","medium",1,47.5,0,FALSE,"Ondra",5,47.5
+"K0259",2026-05-26,"18:45","Kladno","flat white","small",1,82.7,0,FALSE,"Kamila",5,82.7
+"K0260",2026-06-19,"11:15","Kralupy","horka","small",1,100.3,0,FALSE,"Nena",4,NA
+"K0261",2026-03-11,"09:15","Kralupy","flat white","small",1,118.2,15,FALSE,"Kamila",3,100.5
+"K0262",2026-03-24,"12:45","Kralupy","flat white","large",1,105.6,0,TRUE,"Kamila",2,105.6
+"K0263",2026-03-16,"12:00","Kladno","horka","large",1,52.1,0,TRUE,"Ondra",5,52.1
+"K0264",2026-04-15,"18:30","Praha-Holešovice","cappuccino","medium",1,104.3,0,FALSE,"Lenka",3,104.3
+"K0265",2026-03-23,"19:00","Kralupy","cappuccino","medium",1,120.4,0,TRUE,"Ondra",4,120.4
+"K0266",2026-05-02,"12:30","Kralupy","flat white","medium",1,128.2,0,FALSE,"Kamila",5,128.2
+"K0267",2026-06-20,"07:00","Praha-Holešovice","caj","small",2,66.4,0,FALSE,"Nena",3,132.8
+"K0268",2026-06-18,"09:15","Kladno","flat white","small",1,104.9,5,TRUE,"Petr",5,99.7
+"K0269",2026-06-17,"16:00","Kralupy","flat white","small",1,104.2,10,FALSE,"Nena",4,93.8
+"K0270",2026-04-28,"11:45","Kladno","caj","small",1,79,5,TRUE,"Nena",5,75
+"K0271",2026-06-22,"10:15","Kladno","horka","medium",1,108.8,0,FALSE,"Nena",4,NA
+"K0272",2026-06-28,"08:15","Kralupy","espresso","medium",2,88.9,0,FALSE,"Petr",2,177.8
+"K0273",2026-05-08,"10:00","Kralupy","espresso","medium",1,73.5,5,FALSE,"Petr",3,69.8
+"K0274",2026-05-20,"19:45","Praha-Holešovice","cappuccino","small",1,122.1,5,FALSE,"Nena",4,116
+"K0275",2026-06-13,"11:30","Praha-Holešovice","flat white","large",1,102.1,0,FALSE,"Lenka",3,102.1
+"K0276",2026-03-12,"17:45","Kralupy","espresso","small",2,64.2,0,FALSE,"Lenka",1,128.4
+"K0277",2026-03-03,"12:30","Kladno","limonada","large",1,104.8,5,FALSE,"Petr",1,99.6
+"K0278",2026-05-21,"11:00","Kralupy","horka","large",4,98.5,0,FALSE,"Lenka",4,394
+"K0279",2026-05-03,"16:15","Kladno","espresso","small",1,128.9,0,FALSE,"Lenka",5,128.9
+"K0280",2026-03-08,"18:00","Kladno","espresso","medium",2,123.1,0,TRUE,"Petr",5,246.2
+"K0281",2026-04-18,"09:45","Kralupy","caj","medium",1,NA,15,TRUE,"Petr",5,100.2
+"K0282",2026-05-22,"15:30","Praha-Holešovice","cappuccino","large",1,57.5,0,FALSE,"Petr",4,57.5
+"K0283",2026-05-05,"09:15","Kladno","cappuccino","medium",1,84.7,10,FALSE,"Lenka",4,76.2
+"K0284",2026-06-10,"10:45","Kladno","cappuccino","medium",3,117.2,0,FALSE,"Kamila",4,351.6
+"K0285",2026-03-25,"19:00","Kladno","espresso","small",1,109.2,0,FALSE,"Nena",5,109.2
+"K0286",2026-05-16,"19:30","Kladno","espresso","medium",1,58.3,10,TRUE,"Kamila",2,52.5
+"K0287",2026-05-26,"10:45","Kralupy","espresso","large",1,70.4,15,FALSE,"Nena",4,59.8
+"K0288",2026-03-18,"07:00","Kralupy","horka","small",2,67.4,0,FALSE,"Petr",3,134.8
+"K0289",2026-04-20,"10:00","Kladno","horka","small",1,46.6,10,TRUE,"Petr",4,41.9
+"K0290",2026-03-16,"12:30","Kralupy","espresso","medium",3,47.4,0,FALSE,"Nena",3,142.2
+"K0291",2026-04-16,"13:15","Praha-Holešovice","caj","medium",2,122.2,0,FALSE,"Kamila",5,244.4
+"K0292",2026-05-25,"18:00","Kralupy","cappuccino","medium",1,79.5,0,FALSE,"Ondra",5,79.5
+"K0293",2026-05-03,"14:00","Kladno","flat white","small",2,40.5,15,TRUE,"Lenka",3,68.8
+"K0294",2026-03-15,"10:45","Praha-Holešovice","cappuccino","medium",1,127.4,0,FALSE,"Kamila",4,127.4
+"K0295",2026-05-19,"12:00","Kladno","caj","medium",1,101.2,15,FALSE,"Kamila",5,86
+"K0296",2026-03-04,"18:30","Kladno","espresso","medium",1,54.2,10,FALSE,"Nena",4,48.8
+"K0297",2026-05-13,"10:30","Praha-Holešovice","espresso","large",1,128.4,0,FALSE,"Lenka",5,128.4
+"K0298",2026-06-02,"11:45","Kladno","caj","large",2,NA,0,TRUE,"Nena",4,186.2
+"K0299",2026-03-12,"14:15","Kladno","espresso","medium",1,72.6,0,FALSE,"Ondra",5,72.6
+"K0300",2026-06-18,"16:45","Kralupy","caj","medium",1,83.6,0,FALSE,"Kamila",4,83.6
+"K0301",2026-06-18,"11:45","Kladno","flat white","medium",1,85.1,0,FALSE,"Ondra",5,85.1
+"K0302",2026-05-06,"17:30","Praha-Holešovice","flat white","medium",1,111.9,0,FALSE,"Petr",4,111.9
+"K0303",2026-03-02,"15:30","Kralupy","cappuccino","small",1,52.6,0,TRUE,"Lenka",4,52.6
+"K0304",2026-04-22,"14:30","Praha-Holešovice","cappuccino","medium",1,47,0,TRUE,"Nena",3,47
+"K0305",2026-04-04,"16:30","Kladno","limonada","small",1,111.4,0,FALSE,"Nena",4,111.4
+"K0306",2026-04-30,"07:45","Kralupy","espresso","small",1,50,0,FALSE,"Ondra",4,50
+"K0307",2026-06-16,"18:30","Kladno","limonada","small",1,91,0,FALSE,"Kamila",4,91
+"K0308",2026-03-02,"11:45","Kladno","espresso","medium",1,51.8,10,FALSE,"Nena",5,46.6
+"K0309",2026-04-02,"14:15","Kralupy","caj","large",3,54.7,5,FALSE,"Nena",5,155.9
+"K0310",2026-05-19,"10:15","Kladno","limonada","medium",2,70.3,10,TRUE,"Petr",4,NA
+"K0311",2026-03-24,"11:45","Kralupy","cappuccino","medium",1,66.9,15,FALSE,"Nena",4,56.9
+"K0312",2026-04-30,"11:30","Kladno","espresso","large",1,126.1,0,FALSE,"Nena",3,126.1
+"K0313",2026-05-22,"19:00","Kralupy","caj","small",1,108.2,0,FALSE,"Kamila",4,108.2
+"K0314",2026-06-15,"15:30","Kralupy","horka","medium",2,83,0,FALSE,"Petr",2,166
+"K0315",2026-04-14,"18:15","Praha-Holešovice","cappuccino","medium",1,85.7,0,TRUE,"Lenka",4,85.7
+"K0316",2026-03-15,"10:00","Kladno","limonada","small",3,96.8,0,TRUE,"Ondra",4,290.4
+"K0317",2026-06-23,"18:30","Praha-Holešovice","cappuccino","large",1,80.1,0,FALSE,"Nena",2,80.1
+"K0318",2026-05-09,"16:00","Kladno","caj","large",1,65.5,0,TRUE,"Ondra",4,65.5
+"K0319",2026-06-22,"07:00","Praha-Holešovice","horka","small",1,44.3,0,FALSE,"Lenka",3,44.3
+"K0320",2026-06-13,"19:45","Kralupy","espresso","medium",1,118,0,TRUE,"Petr",3,118
+"K0321",2026-06-25,"09:00","Kralupy","flat white","medium",1,111.5,0,TRUE,"Nena",5,111.5
+"K0322",2026-05-03,"12:15","Kralupy","flat white","medium",1,66.5,0,TRUE,"Kamila",5,66.5
+"K0323",2026-04-06,"15:45","Praha-Holešovice","espresso","large",1,117.2,0,FALSE,"Nena",2,117.2
+"K0324",2026-05-09,"09:15","Kralupy","horka","medium",1,57.9,0,FALSE,"Petr",5,57.9
+"K0325",2026-05-27,"08:30","Kladno","horka","small",1,105.2,0,FALSE,"Nena",5,105.2
+"K0326",2026-06-18,"10:00","Kladno","cappuccino","medium",1,101.6,10,FALSE,"Nena",4,91.4
+"K0327",2026-06-17,"18:15","Kladno","horka","small",1,47.5,0,FALSE,"Kamila",3,47.5
+"K0328",2026-06-06,"16:00","Kladno","horka","medium",1,128.3,0,FALSE,"Petr",2,128.3
+"K0329",2026-05-14,"15:30","Kladno","limonada","small",1,58.9,0,TRUE,"Nena",4,58.9
+"K0330",2026-04-28,"09:00","Praha-Holešovice","espresso","large",1,124.1,0,FALSE,"Petr",1,124.1
+"K0331",2026-05-02,"15:45","Praha-Holešovice","cappuccino","small",1,114.3,0,FALSE,"Nena",3,114.3
+"K0332",2026-06-10,"17:15","Kralupy","horka","large",1,121.9,0,FALSE,"Nena",4,121.9
+"K0333",2026-04-23,"07:00","Kralupy","caj","small",1,82.1,5,TRUE,"Lenka",5,78
+"K0334",2026-04-28,"15:00","Kralupy","espresso","medium",1,66.9,0,FALSE,"Kamila",4,66.9
+"K0335",2026-04-27,"14:30","Kladno","espresso","medium",1,67.9,0,FALSE,"Nena",5,67.9
+"K0336",2026-03-06,"10:15","Kralupy","espresso","small",1,76.5,15,TRUE,"Petr",4,65
+"K0337",2026-06-10,"08:15","Kralupy","caj","medium",1,107.5,0,FALSE,"Petr",5,107.5
+"K0338",2026-04-09,"16:15","Kralupy","flat white","medium",1,76.7,5,FALSE,"Lenka",4,72.9
+"K0339",2026-05-16,"14:45","Praha-Holešovice","cappuccino","large",2,43.6,15,FALSE,"Kamila",5,74.1
+"K0340",2026-06-10,"18:15","Kralupy","espresso","large",1,49.8,0,FALSE,"Kamila",2,49.8
+"K0341",2026-03-16,"08:45","Praha-Holešovice","flat white","medium",1,108.4,0,FALSE,"Kamila",4,108.4
+"K0342",2026-04-05,"08:15","Kladno","espresso","medium",2,61.9,15,FALSE,"Kamila",4,105.2
+"K0343",2026-06-11,"11:30","Praha-Holešovice","espresso","medium",1,113.7,15,TRUE,"Kamila",5,96.6
+"K0344",2026-05-10,"08:30","Praha-Holešovice","horka","large",1,41.7,0,TRUE,"Petr",2,41.7
+"K0345",2026-04-24,"19:15","Kladno","cappuccino","medium",1,50.2,15,FALSE,"Kamila",3,42.7
+"K0346",2026-03-30,"08:15","Kladno","flat white","small",1,72,5,FALSE,"Nena",4,68.4
+"K0347",2026-06-10,"08:45","Kralupy","cappuccino","large",1,68.8,0,FALSE,"Ondra",5,68.8
+"K0348",2026-05-15,"08:45","Kralupy","flat white","medium",1,45.5,10,TRUE,"Nena",5,41
+"K0349",2026-05-01,"16:15","Praha-Holešovice","espresso","medium",1,118.7,0,FALSE,"Petr",4,118.7
+"K0350",2026-06-24,"12:30","Kralupy","flat white","small",1,87.2,15,TRUE,"Kamila",5,74.1
+"K0351",2026-05-30,"14:15","Kladno","flat white","small",1,53,0,FALSE,"Petr",4,53
+"K0352",2026-05-09,"14:15","Kladno","flat white","medium",2,41.9,0,TRUE,"Ondra",5,83.8
+"K0353",2026-05-14,"10:45","Kladno","cappuccino","medium",3,110.7,0,TRUE,"Petr",4,NA
+"K0354",2026-05-30,"08:30","Kralupy","caj","small",2,57.3,0,FALSE,"Kamila",5,114.6
+"K0355",2026-05-03,"17:15","Kladno","cappuccino","small",1,87.3,5,FALSE,"Ondra",4,82.9
+"K0356",2026-05-02,"09:15","Kladno","espresso","medium",2,46.3,0,TRUE,"Lenka",3,92.6
+"K0357",2026-06-17,"17:00","Kralupy","horka","small",1,51.2,0,FALSE,"Kamila",5,51.2
+"K0358",2026-06-25,"08:30","Praha-Holešovice","horka","small",1,61.3,0,FALSE,"Petr",3,61.3
+"K0359",2026-06-27,"09:00","Kladno","caj","medium",1,75.3,15,FALSE,"Lenka",4,64
+"K0360",2026-04-06,"19:15","Kralupy","caj","small",2,118.7,0,FALSE,"Ondra",3,237.4
+"K0361",2026-06-08,"12:15","Kralupy","espresso","large",1,106.5,10,FALSE,"Kamila",4,95.9
+"K0362",2026-06-16,"10:15","Kladno","horka","medium",2,43.9,0,FALSE,"Ondra",5,87.8
+"K0363",2026-06-28,"09:45","Kladno","cappuccino","medium",1,51.1,10,FALSE,"Lenka",4,46
+"K0364",2026-05-05,"16:45","Kralupy","cappuccino","large",2,121.7,0,TRUE,"Petr",5,243.4
+"K0365",2026-04-20,"12:00","Praha-Holešovice","espresso","large",1,92.3,0,FALSE,"Petr",4,92.3
+"K0366",2026-06-19,"18:45","Kralupy","espresso","small",2,122.8,0,FALSE,"Kamila",4,245.6
+"K0367",2026-04-27,"17:00","Kladno","caj","medium",1,91.9,0,TRUE,"Kamila",3,91.9
+"K0368",2026-05-18,"13:45","Kralupy","espresso","small",3,109.6,0,FALSE,"Petr",5,328.8
+"K0369",2026-05-16,"14:15","Kladno","horka","large",1,48.3,0,FALSE,"Lenka",4,48.3
+"K0370",2026-06-29,"18:30","Kladno","caj","medium",3,62.1,0,FALSE,"Lenka",3,186.3
+"K0371",2026-04-07,"17:30","Kladno","cappuccino","small",1,67.2,0,TRUE,"Petr",5,67.2
+"K0372",2026-04-30,"19:30","Kladno","espresso","large",1,117,10,FALSE,"Nena",3,105.3
+"K0373",2026-04-27,"12:00","Kladno","cappuccino","large",3,108.9,0,TRUE,"Lenka",5,326.7
+"K0374",2026-05-26,"13:45","Kralupy","espresso","medium",1,54.1,0,FALSE,"Lenka",4,54.1
+"K0375",2026-05-17,"13:15","Kralupy","flat white","medium",1,NA,0,FALSE,"Petr",4,105.8
+"K0376",2026-05-28,"19:30","Kralupy","cappuccino","medium",1,76.2,0,TRUE,"Kamila",4,76.2
+"K0377",2026-05-07,"08:15","Kladno","horka","small",1,68.1,10,FALSE,"Ondra",5,61.3
+"K0378",2026-05-27,"16:00","Kralupy","cappuccino","small",1,89.6,0,FALSE,"Nena",4,89.6
+"K0379",2026-05-08,"09:45","Kralupy","horka","small",1,49.1,10,FALSE,"Nena",5,44.2
+"K0380",2026-05-31,"11:45","Kladno","flat white","small",2,60.1,0,FALSE,"Nena",5,120.2
+"K0381",2026-03-16,"19:00","Kralupy","espresso","medium",3,41.9,0,FALSE,"Petr",5,125.7
+"K0382",2026-03-23,"08:15","Kralupy","cappuccino","small",1,42.3,0,TRUE,"Lenka",5,42.3
+"K0383",2026-06-23,"14:30","Praha-Holešovice","limonada","medium",1,61.7,0,FALSE,"Nena",2,61.7
+"K0384",2026-05-22,"14:30","Kralupy","cappuccino","medium",1,104.3,0,FALSE,"Ondra",3,104.3
+"K0385",2026-06-17,"16:45","Praha-Holešovice","espresso","small",1,114.7,10,FALSE,"Nena",4,103.2
+"K0386",2026-05-18,"07:15","Praha-Holešovice","espresso","large",1,117.4,0,FALSE,"Kamila",4,117.4
+"K0387",2026-04-01,"10:00","Kralupy","flat white","large",1,99.6,0,FALSE,"Nena",5,99.6
+"K0388",2026-03-20,"17:15","Praha-Holešovice","flat white","medium",2,51.6,0,FALSE,"Ondra",1,103.2
+"K0389",2026-06-11,"19:15","Kladno","horka","medium",2,81.3,0,TRUE,"Nena",4,162.6
+"K0390",2026-05-22,"13:30","Kladno","limonada","small",2,80.2,0,FALSE,"Petr",5,160.4
+"K0391",2026-06-04,"15:15","Kralupy","espresso","small",1,57.1,0,TRUE,"Nena",5,57.1
+"K0392",2026-05-19,"17:30","Kladno","espresso","medium",1,51.1,5,FALSE,"Kamila",5,48.5
+"K0393",2026-05-05,"17:15","Kralupy","cappuccino","small",1,90.8,0,TRUE,"Nena",5,90.8
+"K0394",2026-05-08,"17:15","Kladno","cappuccino","small",1,98.1,15,FALSE,"Petr",5,83.4
+"K0395",2026-04-12,"16:45","Kladno","cappuccino","small",1,74.1,0,FALSE,"Nena",4,74.1
+"K0396",2026-04-13,"11:00","Kralupy","flat white","medium",1,128.1,0,TRUE,"Petr",4,128.1
+"K0397",2026-05-20,"13:00","Kralupy","cappuccino","large",1,82.4,0,FALSE,"Ondra",5,82.4
+"K0398",2026-06-11,"12:30","Kralupy","espresso","medium",2,41.9,0,TRUE,"Lenka",3,83.8
+"K0399",2026-03-10,"10:15","Kralupy","limonada","small",1,59.6,0,TRUE,"Kamila",5,59.6
+"K0400",2026-03-31,"11:30","Kralupy","cappuccino","small",1,60.8,0,TRUE,"Nena",2,60.8
+"K0401",2026-03-16,"15:30","Kladno","flat white","medium",1,92.7,0,TRUE,"Lenka",1,92.7
+"K0402",2026-05-08,"09:00","Kladno","espresso","medium",1,108.6,0,TRUE,"Nena",3,108.6
+"K0403",2026-06-10,"15:30","Kralupy","espresso","large",2,74.8,5,FALSE,"Lenka",4,142.1
+"K0404",2026-04-02,"17:15","Kralupy","espresso","large",1,62.8,0,TRUE,"Petr",4,62.8
+"K0405",2026-04-18,"14:45","Kladno","flat white","small",2,121.6,0,FALSE,"Petr",4,243.2
+"K0406",2026-03-15,"13:45","Kralupy","espresso","small",1,70.1,0,FALSE,"Ondra",4,70.1
+"K0407",2026-06-01,"10:30","Praha-Holešovice","horka","large",1,74.5,0,FALSE,"Nena",4,74.5
+"K0408",2026-03-25,"17:45","Kralupy","flat white","medium",2,39.8,0,FALSE,"Petr",4,79.6
+"K0409",2026-05-23,"14:45","Kralupy","flat white","small",1,119.3,0,FALSE,"Kamila",4,119.3
+"K0410",2026-06-24,"08:45","Kralupy","flat white","medium",1,128.9,0,FALSE,"Ondra",4,128.9
+"K0411",2026-03-26,"19:15","Kladno","cappuccino","small",1,71.8,0,FALSE,"Nena",5,71.8
+"K0412",2026-06-06,"13:00","Kralupy","cappuccino","small",1,97.4,0,FALSE,"Nena",5,97.4
+"K0413",2026-05-15,"08:15","Praha-Holešovice","flat white","small",2,102.1,0,TRUE,"Ondra",4,204.2
+"K0414",2026-05-02,"18:45","Kladno","flat white","medium",1,49,5,FALSE,"Nena",3,46.5
+"K0415",2026-05-27,"09:45","Kralupy","flat white","medium",1,67.3,0,FALSE,"Lenka",5,67.3
+"K0416",2026-05-07,"13:45","Kladno","flat white","large",3,70.7,15,TRUE,"Petr",4,180.3
+"K0417",2026-05-20,"10:45","Kladno","flat white","medium",4,85.1,0,TRUE,"Nena",5,340.4
+"K0418",2026-06-28,"14:30","Kladno","cappuccino","medium",4,90,15,FALSE,"Ondra",2,NA
+"K0419",2026-04-15,"19:00","Praha-Holešovice","cappuccino","medium",2,107.6,0,TRUE,"Lenka",4,215.2
+"K0420",2026-04-22,"09:15","Kladno","espresso","small",1,60.5,0,FALSE,"Kamila",2,60.5

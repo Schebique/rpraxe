@@ -1,0 +1,2 @@
+// Pomocné funkce pro automatickou kontrolu — injectuje runner, student je nevidí.
+// (soubor jen pro dokumentaci; skutečná definice je v runner/server.py)

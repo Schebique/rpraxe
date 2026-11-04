@@ -1,0 +1,11 @@
+popis datasetu dojizdka.csv (synteticka data,inspirovana datasetem z kurzu)
+id_linka      - identifikator linky (text)
+obec          - name obce, ze ktere se dojiždí (faktor)
+skola_typ     - typ skoly (zakladni skola / stredni skola / ucilisni obor)
+pocet_zaku    - pocet dojíždějících žáků (celé číslo)
+vzdalenost_km - vzdálenost ve km (desetinné číslo, DEC = TEČKA)
+cas_min       - doba dojížďky v minutách
+doprava       - prostředek (ordinaální faktor: pesky < kolo < MHD < autem < vlak)
+den           - den v týdnu (ordinaální faktor)
+sldb_rok      - rok zjištění
+platna_do     - datum platnosti údaje (ISO)

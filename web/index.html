@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="cs" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R v ruce — denní procvičování</title>
+<script>
+  /* motiv dřív, než se nakreslí stránka, ať to neblikne */
+  try {
+    const t = localStorage.getItem("rpraxe.theme") || "auto";
+    const dark = t === "dark" || (t === "auto" && !(window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches));
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  } catch (e) { document.documentElement.dataset.theme = "dark"; }
+</script>
+<link rel="stylesheet" href="/static/vendor/codemirror.css">
+<link rel="stylesheet" href="/static/vendor/material-darker.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">R&nbsp;v&nbsp;ruce</div>
+    <nav>
+      <button data-view="today" class="on">Dnes</button>
+      <button data-view="lib">Knihovna</button>
+      <button data-view="prog">Progres</button>
+      <button data-view="sheet">Tahák</button>
+      <button data-view="class" id="nav-class" hidden>Třída</button>
+      <button data-view="admin" id="nav-admin" hidden>Správa</button>
+    </nav>
+    <div class="right">
+      <div class="usermenu">
+        <button id="btn-user" class="userchip" aria-haspopup="true" aria-expanded="false"
+                title="Přihlášený uživatel">
+          <span id="who"></span><span class="caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="menu" id="usermenu" hidden>
+          <button id="btn-settings" type="button">Nastavení</button>
+          <button id="btn-pass" type="button">Změnit heslo</button>
+        </div>
+      </div>
+      <span id="streak" title="za sebou dní s alespoň jednou vyplněnou úlohou"></span>
+      <a href="/logout" class="tiny muted">odhlásit</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ================= DNES ================= -->
+    <section class="view on" id="v-today">
+      <div class="today">
+        <aside>
+          <div class="card" style="margin-bottom:14px">
+            <div class="row" style="justify-content:space-between">
+              <strong id="day-title">dnes</strong>
+              <span class="tiny muted" id="budget-lbl"></span>
+            </div>
+            <div class="bar" style="margin:8px 0 6px"><i id="min-bar" style="width:0%"></i></div>
+            <div class="tiny muted" id="min-lbl"></div>
+            <div class="row" style="margin-top:10px">
+              <button class="ghost" id="btn-refresh" title="nová dnešní dávka">nová dávka</button>
+              <select id="budget" style="width:auto">
+                <option value="15">15 min</option><option value="20">20 min</option>
+                <option value="30">30 min</option><option value="45">45 min</option>
+              </select>
+            </div>
+          </div>
+          <div class="card" id="agent-note" style="display:none;margin-bottom:14px;font-size:13px;white-space:pre-wrap;border-left:3px solid var(--accent2)"></div>
+          <details class="card planbox" id="planbox" open>
+            <summary id="planbox-title">Dnešní úlohy</summary>
+            <div id="planlist"></div>
+          </details>
+        </aside>
+
+        <div class="split">
+          <div class="pane">
+            <div class="hd">
+              <strong id="t-title">vyber úlohu</strong>
+              <span class="muted tiny" id="t-meta"></span>
+              <div class="tabs">
+                <button class="on" data-pane="zadani">zadání</button>
+                <button data-pane="data">data</button>
+              </div>
+            </div>
+            <div class="bd" id="pane-zadani">
+              <div id="zadani" class="muted">…</div>
+              <div class="row" style="margin-top:12px">
+                <button id="btn-hint">nápověda</button>
+                <button id="btn-sol" class="ghost">ukázat řešení</button>
+                <button id="btn-note" class="ghost">zapsat poznámku</button>
+              </div>
+              <div id="hintbox"></div>
+              <div id="mynote" class="coach" style="display:none"></div>
+            </div>
+            <div class="bd" id="pane-data" style="display:none">
+              <div id="datainfo" class="tiny muted" style="margin:0 0 6px">soubor: —</div>
+              <div id="datatable"></div>
+              <div id="dataprev" class="dataset-pre muted" style="display:none">—</div>
+              <div class="tiny muted" style="margin-top:8px">
+                V editoru máš data připravená v pracovní složce; načti je stejně jako v lekci
+                (<code>read.csv("…")</code> nebo <code>read.csv2("…")</code>).
+              </div>
+            </div>
+          </div>
+
+          <div class="pane" style="display:flex;flex-direction:column">
+            <div class="hd">
+              <button class="primary" id="btn-run">spustit ▸</button>
+              <button id="btn-check">zkontrolovat ✓</button>
+              <span class="tiny muted">Ctrl+Enter spustí, Ctrl+B kontrola</span>
+              <span id="busy" style="margin-left:auto"></span>
+            </div>
+            <div id="editor"></div>
+            <div class="out" id="out">výstup se objeví tady…</div>
+            <div class="plotrow" id="plots" style="display:none"></div>
+            <div class="verdict" id="verdict" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= KNIHOVNA ================= -->
+    <section class="view" id="v-lib">
+      <div class="row" style="margin-bottom:14px">
+        <strong>Knihovna úloh</strong>
+        <select id="f-lesson" style="width:auto"><option value="">všechny lekce</option></select>
+        <select id="f-status" style="width:auto">
+          <option value="">vše</option><option value="approved">schválené</option>
+          <option value="draft">čeká na ověření</option>
+        </select>
+        <input id="f-q" placeholder="hledat v názvu/zadání…" style="width:260px">
+        <button id="btn-gen" class="ghost" title="nechat AI napsat a automaticky ověřit dvě nové úlohy">+ vygenerovat úlohy</button>
+        <span id="genstatus" class="tiny muted"></span>
+      </div>
+      <div class="card" style="padding:0;overflow:auto">
+        <table id="tasks"></table>
+      </div>
+    </section>
+
+    <!-- ================= PROGRES ================= -->
+    <section class="view" id="v-prog">
+      <div class="grid g3" id="kpis"></div>
+      <div class="grid g2" style="margin-top:14px">
+        <div class="card"><h3>Posledních 30 dní</h3><div class="spark" id="spark"></div>
+          <div class="tiny muted" id="spark-lbl"></div></div>
+        <div class="card"><h3>Dovednosti (odhad úrovně)</h3><div id="skillbars"></div></div>
+        <div class="card"><h3>Kde se to zadrhává</h3><div id="hard"></div></div>
+        <div class="card"><h3>Tvoje poznámky</h3><div id="mynotes"></div>
+          <p class="tiny muted">Poznámku píšeš u úlohy tlačítkem „zapsat poznámku“. Uloží se k ní
+            a je vidět i po přihlášení z jiného zařízení.</p></div>
+        <div class="card"><h3>Pokud narazíš na chybu</h3><div id="glossary"></div></div>
+      </div>
+      <div class="card" style="margin-top:14px"><h3>Posledních 25 pokusů</h3>
+        <div style="overflow:auto"><table id="recent"></table></div>
+        <div class="row" style="margin-top:12px"><a href="/api/export"><button class="ghost">stáhnout CSV (celá historie)</button></a></div>
+      </div>
+    </section>
+
+    <!-- ================= TŘÍDA (učitel) ================= -->
+    <section class="view" id="v-class">
+      <div class="card"><h3>Žáci</h3>
+        <div style="overflow:auto"><table id="class"></table></div>
+        <p class="tiny muted">Údaje jsou z tvého serveru; studenti je vidí taky, navzájem ne.</p></div>
+      <div class="card" style="margin-top:14px" id="studentdetail"></div>
+      <div class="card" style="margin-top:14px">
+        <h3 id="taskeditor-title">Nová úloha</h3>
+        <p class="tiny muted">Kontrola je R kód, který musí vrátit TRUE nebo
+          <code>list(pass=, msg=)</code>. Očekávanou hodnotu počítej ze dat (<code>read.csv</code>),
+          nepiš čísla napevno. Uložení samo spustí řešení i prázdný kód — úloha se ukáže až když
+          projde.</p>
+        <div class="grid g2">
+          <div><label for="nt-id">id</label><input id="nt-id" placeholder="nechat vygenerovat"></div>
+          <div><label for="nt-title">titulek</label><input id="nt-title"></div>
+          <div><label for="nt-lesson">lekce (0–11)</label><input id="nt-lesson" value="4"></div>
+          <div><label for="nt-min">minuty</label><input id="nt-min" value="4"></div>
+          <div><label for="nt-level">obtížnost 0–5</label><input id="nt-level" value="2"></div>
+          <div><label for="nt-skills">dovednosti (odděl čárkou)</label><input id="nt-skills"></div>
+          <div><label for="nt-dataset">dataset (soubor, nebo prázdné)</label><input id="nt-dataset"></div>
+          <div><label for="nt-nacti">načtení dat v R</label><input id="nt-nacti"></div>
+        </div>
+        <label for="nt-zadani">zadání</label><textarea id="nt-zadani" rows="3"></textarea>
+        <label for="nt-starter">startovací kostra</label><textarea id="nt-starter" rows="3"></textarea>
+        <label for="nt-reseni">řešení (musí projít kontrolou)</label><textarea id="nt-reseni" rows="5"></textarea>
+        <label for="nt-check">kontrola (R)</label><textarea id="nt-check" rows="5"></textarea>
+        <label for="nt-hints">napovědy (jedna na řádek)</label><textarea id="nt-hints" rows="3"></textarea>
+        <div class="row end" style="margin-top:10px">
+          <button id="nt-clear" class="ghost" type="button">vyčistit</button>
+          <button id="nt-save" class="primary" type="button">Uložit a ověřit</button>
+        </div>
+        <p class="tiny" id="nt-status" role="status"></p>
+      </div>
+    </section>
+
+    <!-- ================= SPRÁVA (admin) ================= -->
+    <section class="view" id="v-admin">
+      <div class="grid g3" id="admin-kpis"></div>
+      <div class="grid g2" style="margin-top:14px">
+        <div class="card"><h3>Účty</h3><div style="overflow:auto"><table id="adm-users"></table></div>
+          <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
+            <input id="nu-name" placeholder="jméno účtu" style="width:140px">
+            <input id="nu-pass" placeholder="heslo (min. 8)" type="text" style="width:150px">
+            <select id="nu-role" style="width:120px"></select>
+            <button id="nu-add" class="ghost" type="button">přidat účet</button>
+          </div>
+          <p class="tiny" id="nu-status" role="status"></p></div>
+        <div class="card"><h3>Zálohy</h3><div id="adm-backups"></div>
+          <div class="row" style="margin-top:10px">
+            <button id="adm-backup" class="ghost" type="button">udělat snímek teď</button></div>
+          <p class="tiny muted">Noční kopie na NAS dělá skript <code>rpraxe-zaloha.sh</code>;
+            tohle je ruční snímek databáze v <code>state/backups</code>.</p></div>
+        <div class="card"><h3>AI</h3><div id="adm-ai"></div></div>
+        <div class="card"><h3>Banka úloh</h3><div id="adm-bank"></div></div>
+      </div>
+    </section>
+
+    <!-- ================= TAHÁK ================= -->
+    <section class="view" id="v-sheet">
+      <div class="card sheet" id="sheet"><p class="muted">Tahák se načítá…</p></div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= POZNÁMKA K ÚLOZE ================= -->
+<div class="modal" id="notemodal" hidden role="dialog" aria-modal="true" aria-labelledby="note-title">
+  <div class="card pwcard">
+    <h3 id="note-title">Poznámka k úloze</h3>
+    <p class="tiny muted">Uloží se domů na server k dané úlohe a uvidíš ji tady i po změně zařízení.
+      Není to součást hodnocení — je to tvůj okraj sešitu.</p>
+    <textarea id="note-text" rows="6" placeholder="co mě tu mrzelo, na co si dát příště pozor…"></textarea>
+    <p class="err tiny" id="note-err" role="alert"></p>
+    <div class="row end">
+      <button id="note-cancel" type="button" class="ghost">zrušit</button>
+      <button id="note-delete" type="button" class="ghost">smazat</button>
+      <button id="note-save" type="button" class="primary">uložit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= NASTAVENÍ ================= -->
+<div class="modal" id="setmodal" hidden role="dialog" aria-modal="true" aria-labelledby="set-title">
+  <div class="card pwcard">
+    <h3 id="set-title">Nastavení účtu</h3>
+    <p class="tiny muted">Platí jen pro tebe a uloží se na server, takže se to projeví i na
+      jiném počítači nebo telefonu.</p>
+    <label for="set-theme">Motiv</label>
+    <select id="set-theme">
+      <option value="auto">Systémový</option><option value="dark">Tmavý</option>
+      <option value="light">Světlý</option>
+    </select>
+    <label for="set-lang">Jazyk rozhraní</label>
+    <select id="set-lang"></select>
+    <label for="set-min">Denní dávka</label>
+    <select id="set-min"></select>
+    <label for="set-model">Model AI kouče</label>
+    <select id="set-model"></select>
+    <p class="tiny muted" id="set-ainote"></p>
+    <p class="err tiny" id="set-err" role="alert"></p>
+    <div class="row end">
+      <button id="set-cancel" type="button" class="ghost">zrušit</button>
+      <button id="set-save" type="button" class="primary">uložit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PROFIL: ZMĚNA HESLA ================= -->
+<div class="modal" id="pwmodal" hidden role="dialog" aria-modal="true" aria-labelledby="pw-title">
+  <div class="card pwcard">
+    <h3 id="pw-title">Změna hesla</h3>
+    <p class="tiny muted">Heslo se mění jen pro tento účet, doma na serveru. Neodhlasuje tě to.</p>
+    <label for="pw-cur">současné heslo</label>
+    <input id="pw-cur" type="password" autocomplete="current-password">
+    <label for="pw-new">nové heslo</label>
+    <input id="pw-new" type="password" autocomplete="new-password">
+    <label for="pw-rep">nové heslo znovu</label>
+    <input id="pw-rep" type="password" autocomplete="new-password">
+    <p class="err tiny" id="pw-err" role="alert"></p>
+    <div class="row end">
+      <button id="pw-cancel" type="button" class="ghost">zrušit</button>
+      <button id="pw-save" type="button" class="primary">změnit heslo</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/i18n.js"></script>
+<script src="/static/vendor/lib/codemirror.js"></script>
+<script src="/static/vendor/mode/r/r.js"></script>
+<script src="/static/vendor/addon/edit/matchbrackets.js"></script>
+<script src="/static/vendor/addon/edit/closebrackets.js"></script>
+<script src="/static/vendor/addon/selection/active-line.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

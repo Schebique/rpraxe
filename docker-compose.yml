@@ -1,0 +1,45 @@
+name: rpraxe
+
+# runner = sandbox pro R; je jen na interní síti bez východu ven
+# app    = web + adaptivní model; východ má jen na lokální Ollamu (přes název hostitele)
+services:
+  runner:
+    image: rpraxe:1
+    command: ["/opt/venv/bin/uvicorn", "runner.server:app", "--host", "0.0.0.0", "--port", "8081", "--app-dir", "/srv"]
+    environment:
+      RPRAXE_DATASETS: /data/datasets
+      RPRAXE_CPU_LIMIT: "20"
+      RPRAXE_WALL_LIMIT: "30"
+      RPRAXE_MEM_MB: "1500"
+    volumes:
+      - ./datasets:/data/datasets:ro
+    tmpfs:
+      - /work:size=256m,mode=1777
+    restart: unless-stopped
+    networks: [exec_net]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 2200m
+    cpus: "2.0"
+
+  app:
+    image: rpraxe:1
+    command: ["sh", "-c", "/opt/venv/bin/python /srv/scripts/check_static.py; exec /opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --app-dir /srv --proxy-headers --forwarded-allow-ips '*'"]
+    env_file: [rpraxe.env]
+    volumes:
+      - ./state:/data/state
+      - ./datasets:/data/datasets:ro
+    ports:
+      # přes .env: doma 172.20.0.1 (brána je macvlan), jinak stačí 127.0.0.1
+      - "${RPRAXE_BIND:-127.0.0.1}:${RPRAXE_PORT:-8710}:8080"
+    depends_on: [runner]
+    restart: unless-stopped
+    networks: [exec_net, egress]
+
+networks:
+  exec_net:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge

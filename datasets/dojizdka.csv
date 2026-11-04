@@ -1,0 +1,261 @@
+"id_linka","obec","skola_typ","pocet_zaku","vzdalenost_km","cas_min","doprava","den","sldb_rok","platna_do"
+"D00001","Kralupy nad Vltavou","zakladni skola",317,26.9,36,"autem","pondeli",2021,2026-08-30
+"D00002","Kralupy nad Vltavou","stredni skola",244,27.7,77,"autem","patek",2021,2027-03-30
+"D00003","Melnik","ucilisni obor",430,23.3,66,"autem","streda",2021,2026-09-30
+"D00004","Slany","zakladni skola",238,3.4,56,"autem","pondeli",2021,2026-12-30
+"D00005","Roudnice nad Labem","stredni skola",195,11.3,64,"autem","patek",2021,2027-03-02
+"D00006","Velvary","stredni skola",82,3.8,15,"autem","patek",2021,2027-11-30
+"D00007","Kladno","zakladni skola",433,25.2,14,"autem","streda",2021,2026-11-30
+"D00008","Veltrusy","stredni skola",284,18,4,"vlak","pondeli",2021,2027-06-30
+"D00009","Mounotov","zakladni skola",164,24.2,51,"vlak","patek",2021,2026-11-30
+"D00010","Veltrusy","zakladni skola",391,17.9,5,"MHD","pondeli",2021,2027-06-30
+"D00011","Melnik","zakladni skola",296,11.5,57,"kolo","pondeli",2021,2027-11-30
+"D00012","Roudnice nad Labem","stredni skola",239,16.3,41,"autem","streda",2021,2027-04-30
+"D00013","Neratovice","zakladni skola",178,19.2,5,"vlak","patek",2021,2026-12-30
+"D00014","Slany","zakladni skola",374,7.1,66,"vlak","patek",2021,2027-06-30
+"D00015","Roudnice nad Labem","ucilisni obor",417,8.1,69,"autem","pondeli",2021,2027-07-30
+"D00016","Kladno","stredni skola",253,11.3,49,"kolo","patek",2021,2026-12-30
+"D00017","Velvary","stredni skola",120,2.1,54,"vlak","patek",2021,2027-05-30
+"D00018","Mounotov","zakladni skola",86,22.7,22,"kolo","streda",2021,2027-08-30
+"D00019","Velvary","ucilisni obor",185,23.9,13,"vlak","patek",2021,2027-05-30
+"D00020","Mounotov","stredni skola",154,17.5,77,"autem","patek",2021,2027-07-30
+"D00021","Neratovice","zakladni skola",273,4.2,14,"pesky","pondeli",2021,2027-08-30
+"D00022","Neratovice","ucilisni obor",467,1,3,"MHD","pondeli",2021,2027-08-30
+"D00023","Kladno","ucilisni obor",461,6.3,29,"MHD","patek",2021,2026-12-30
+"D00024","Kralupy nad Vltavou","zakladni skola",458,7.2,49,"autem","streda",2021,2026-12-30
+"D00025","Roudnice nad Labem","ucilisni obor",429,3.9,34,"MHD","patek",2021,2026-10-30
+"D00026","Roudnice nad Labem","ucilisni obor",461,14.4,39,"MHD","streda",2021,2027-03-02
+"D00027","Roudnice nad Labem","zakladni skola",338,27.9,63,"autem","patek",2021,2026-07-30
+"D00028","Veltrusy","ucilisni obor",46,15.5,13,"kolo","patek",2021,2027-03-30
+"D00029","Mounotov","zakladni skola",178,4.5,74,"autem","pondeli",2021,2026-11-30
+"D00030","Slany","zakladni skola",108,21.4,70,"autem","patek",2021,2027-05-30
+"D00031","Neratovice","ucilisni obor",220,21.2,64,"MHD","streda",2021,2027-08-30
+"D00032","Kladno","zakladni skola",150,9.7,28,"kolo","patek",2021,2026-08-30
+"D00033","Neratovice","stredni skola",449,13.4,74,"kolo","streda",2021,2027-10-30
+"D00034","Kladno","ucilisni obor",328,25.4,63,"MHD","streda",2021,2026-12-30
+"D00035","Roudnice nad Labem","ucilisni obor",473,0.5,13,"vlak","patek",2021,2027-12-30
+"D00036","Kralupy nad Vltavou","stredni skola",401,2.6,5,"pesky","pondeli",2021,2027-08-30
+"D00037","Kralupy nad Vltavou","stredni skola",433,23.3,42,"MHD","pondeli",2021,2027-03-02
+"D00038","Mounotov","stredni skola",86,15.4,55,"kolo","pondeli",2021,2027-01-30
+"D00039","Kladno","ucilisni obor",201,26.1,32,"autem","streda",2021,2026-07-30
+"D00040","Velvary","ucilisni obor",289,21.7,36,"autem","pondeli",2021,2026-12-30
+"D00041","Melnik","zakladni skola",265,14.7,20,"MHD","streda",2021,2026-07-30
+"D00042","Mounotov","ucilisni obor",313,21.9,25,"kolo","streda",2021,2027-09-30
+"D00043","Melnik","ucilisni obor",123,7.1,10,"MHD","streda",2021,2027-11-30
+"D00044","Litomerice","zakladni skola",403,12.6,34,"MHD","streda",2021,2027-04-30
+"D00045","Kralupy nad Vltavou","ucilisni obor",95,18.6,34,"MHD","streda",2021,2026-11-30
+"D00046","Kralupy nad Vltavou","zakladni skola",169,4.9,45,"MHD","streda",2021,2026-11-30
+"D00047","Slany","stredni skola",40,13.8,61,"autem","pondeli",2021,2027-11-30
+"D00048","Kladno","stredni skola",426,27.9,53,"MHD","pondeli",2021,2027-12-30
+"D00049","Slany","stredni skola",67,17.1,49,"autem","pondeli",2021,2026-06-30
+"D00050","Kladno","stredni skola",40,11.5,18,"kolo","streda",2021,2027-01-30
+"D00051","Mounotov","ucilisni obor",153,9,48,"kolo","streda",2021,2026-11-30
+"D00052","Mounotov","ucilisni obor",119,26.6,47,"MHD","pondeli",2021,2026-10-30
+"D00053","Veltrusy","stredni skola",138,9.2,66,"autem","patek",2021,2027-03-02
+"D00054","Neratovice","zakladni skola",39,17.2,40,"autem","pondeli",2021,2026-10-30
+"D00055","Melnik","stredni skola",152,26,36,"autem","pondeli",2021,2026-08-30
+"D00056","Kralupy nad Vltavou","stredni skola",269,18.6,60,"kolo","pondeli",2021,2027-06-30
+"D00057","Kladno","ucilisni obor",318,23.5,16,"vlak","pondeli",2021,2027-06-30
+"D00058","Mounotov","zakladni skola",302,25.3,52,"MHD","streda",2021,2027-05-30
+"D00059","Kralupy nad Vltavou","zakladni skola",325,5.5,77,"autem","streda",2021,2027-06-30
+"D00060","Kralupy nad Vltavou","stredni skola",430,3.2,75,"autem","streda",2021,2027-06-30
+"D00061","Velvary","ucilisni obor",433,14,75,"MHD","patek",2021,2027-06-30
+"D00062","Kladno","ucilisni obor",230,4.3,12,"pesky","streda",2021,2027-08-30
+"D00063","Slany","ucilisni obor",43,22.8,66,"autem","patek",2021,2027-11-30
+"D00064","Litomerice","stredni skola",353,12.1,49,"autem","streda",2021,2027-09-30
+"D00065","Roudnice nad Labem","ucilisni obor",239,17.8,14,"pesky","pondeli",2021,2027-04-30
+"D00066","Roudnice nad Labem","ucilisni obor",17,3.1,46,"MHD","pondeli",2021,2026-06-30
+"D00067","Neratovice","zakladni skola",205,6.6,4,"autem","streda",2021,2027-12-30
+"D00068","Roudnice nad Labem","stredni skola",371,15.9,66,"autem","streda",2021,2027-03-30
+"D00069","Litomerice","ucilisni obor",406,10.3,76,"autem","streda",2021,2027-08-30
+"D00070","Melnik","stredni skola",334,1.2,39,"autem","streda",2021,2026-07-30
+"D00071","Litomerice","stredni skola",65,12.5,76,"MHD","patek",2021,2026-10-30
+"D00072","Neratovice","zakladni skola",394,1.8,24,"MHD","streda",2021,2027-06-30
+"D00073","Velvary","stredni skola",393,9.2,72,"autem","patek",2021,2026-07-30
+"D00074","Litomerice","zakladni skola",290,13.7,61,"MHD","pondeli",2021,2027-03-02
+"D00075","Litomerice","stredni skola",142,8.6,74,"autem","pondeli",2021,2027-04-30
+"D00076","Neratovice","zakladni skola",266,3,13,"autem","streda",2021,2027-07-30
+"D00077","Mounotov","stredni skola",32,5.5,29,"autem","streda",2021,2027-11-30
+"D00078","Litomerice","ucilisni obor",243,21.3,56,"MHD","patek",2021,2027-06-30
+"D00079","Mounotov","ucilisni obor",470,5,4,"autem","patek",2021,2026-09-30
+"D00080","Litomerice","ucilisni obor",152,15.4,16,"MHD","pondeli",2021,2026-06-30
+"D00081","Veltrusy","stredni skola",39,24.9,60,"MHD","streda",2021,2027-08-30
+"D00082","Neratovice","stredni skola",81,11.4,57,"autem","pondeli",2021,2026-07-30
+"D00083","Veltrusy","ucilisni obor",438,3.1,40,"kolo","patek",2021,2026-10-30
+"D00084","Kladno","stredni skola",283,8.9,47,"MHD","patek",2021,2027-07-30
+"D00085","Kralupy nad Vltavou","ucilisni obor",282,1.6,36,"MHD","pondeli",2021,2026-11-30
+"D00086","Velvary","zakladni skola",32,24.9,36,"autem","patek",2021,2027-05-30
+"D00087","Litomerice","ucilisni obor",348,10.7,62,"kolo","patek",2021,2027-03-02
+"D00088","Kladno","ucilisni obor",159,23.7,48,"autem","streda",2021,2027-06-30
+"D00089","Veltrusy","ucilisni obor",276,NA,68,"pesky","pondeli",2021,2026-12-30
+"D00090","Kralupy nad Vltavou","stredni skola",438,22.2,18,"pesky","patek",2021,2027-01-30
+"D00091","Velvary","stredni skola",426,20.6,71,"MHD","pondeli",2021,2026-12-30
+"D00092","Slany","zakladni skola",409,NA,75,"pesky","pondeli",2021,2027-05-30
+"D00093","Mounotov","ucilisni obor",136,19,16,"MHD","streda",2021,2026-08-30
+"D00094","Melnik","stredni skola",472,20.2,49,"pesky","pondeli",2021,2027-10-30
+"D00095","Kladno","ucilisni obor",336,9.3,16,"pesky","streda",2021,2027-12-30
+"D00096","Kladno","zakladni skola",444,11.8,20,"MHD","patek",2021,2027-07-30
+"D00097","Kladno","ucilisni obor",289,15.4,49,"MHD","pondeli",2021,2027-09-30
+"D00098","Mounotov","ucilisni obor",280,8.5,8,"pesky","patek",2021,2027-01-30
+"D00099","Melnik","stredni skola",297,16.7,60,"kolo","patek",2021,2027-05-30
+"D00100","Melnik","stredni skola",140,3.9,34,"autem","pondeli",2021,2027-08-30
+"D00101","Mounotov","ucilisni obor",135,3.6,27,"vlak","pondeli",2021,2027-07-30
+"D00102","Melnik","zakladni skola",45,25.9,28,"vlak","streda",2021,2026-08-30
+"D00103","Velvary","ucilisni obor",202,3.6,72,"vlak","patek",2021,2027-03-02
+"D00104","Velvary","zakladni skola",34,19.5,45,"autem","streda",2021,2026-09-30
+"D00105","Melnik","ucilisni obor",66,27.6,64,"autem","pondeli",2021,2027-07-30
+"D00106","Neratovice","stredni skola",274,24.1,68,"MHD","streda",2021,2027-10-30
+"D00107","Neratovice","stredni skola",444,13.4,6,"kolo","streda",2021,2027-11-30
+"D00108","Neratovice","zakladni skola",255,9,6,"kolo","streda",2021,2027-05-30
+"D00109","Veltrusy","stredni skola",244,15.4,30,"vlak","patek",2021,2026-06-30
+"D00110","Mounotov","zakladni skola",318,11.9,51,"autem","pondeli",2021,2027-06-30
+"D00111","Litomerice","ucilisni obor",62,24.8,33,"MHD","patek",2021,2027-06-30
+"D00112","Melnik","stredni skola",147,3.1,54,"autem","streda",2021,2026-12-30
+"D00113","Roudnice nad Labem","stredni skola",417,5.3,42,"vlak","pondeli",2021,2027-08-30
+"D00114","Roudnice nad Labem","stredni skola",38,17.1,59,"kolo","patek",2021,2027-12-30
+"D00115","Mounotov","stredni skola",182,18,24,"MHD","pondeli",2021,2027-01-30
+"D00116","Litomerice","stredni skola",131,4.7,32,"autem","pondeli",2021,2027-03-02
+"D00117","Roudnice nad Labem","zakladni skola",55,21.1,28,"kolo","patek",2021,2027-06-30
+"D00118","Roudnice nad Labem","ucilisni obor",387,21.7,54,"kolo","streda",2021,2027-06-30
+"D00119","Neratovice","ucilisni obor",374,26.5,64,"autem","patek",2021,2026-12-30
+"D00120","Velvary","ucilisni obor",280,12.7,63,"vlak","pondeli",2021,2026-09-30
+"D00121","Neratovice","zakladni skola",347,9,23,"pesky","pondeli",2021,2026-09-30
+"D00122","Litomerice","zakladni skola",220,NA,65,"pesky","pondeli",2021,2027-01-30
+"D00123","Mounotov","zakladni skola",475,8.3,10,"autem","patek",2021,2027-10-30
+"D00124","Litomerice","stredni skola",438,2.5,24,"autem","streda",2021,2026-10-30
+"D00125","Mounotov","ucilisni obor",313,16.6,77,"autem","patek",2021,2027-08-30
+"D00126","Roudnice nad Labem","ucilisni obor",366,10.4,30,"autem","pondeli",2021,2027-12-30
+"D00127","Melnik","stredni skola",249,13.9,36,"pesky","streda",2021,2027-03-30
+"D00128","Kralupy nad Vltavou","ucilisni obor",75,0.6,30,"vlak","streda",2021,2027-08-30
+"D00129","Veltrusy","ucilisni obor",180,12.5,73,"MHD","patek",2021,2027-06-30
+"D00130","Litomerice","stredni skola",186,4.3,14,"vlak","streda",2021,2027-05-30
+"D00131","Roudnice nad Labem","ucilisni obor",339,9.4,14,"MHD","streda",2021,2026-07-30
+"D00132","Mounotov","ucilisni obor",395,8.4,59,"autem","pondeli",2021,2027-04-30
+"D00133","Neratovice","zakladni skola",427,16.8,9,"autem","pondeli",2021,2026-08-30
+"D00134","Velvary","zakladni skola",476,18.9,66,"kolo","pondeli",2021,2027-10-30
+"D00135","Neratovice","ucilisni obor",137,8.7,76,"autem","streda",2021,2026-12-30
+"D00136","Roudnice nad Labem","ucilisni obor",251,13.9,75,"MHD","patek",2021,2026-11-30
+"D00137","Slany","stredni skola",214,11.2,8,"MHD","streda",2021,2027-03-02
+"D00138","Melnik","stredni skola",412,14,21,"MHD","pondeli",2021,2027-11-30
+"D00139","Melnik","stredni skola",91,28,33,"autem","streda",2021,2027-06-30
+"D00140","Mounotov","zakladni skola",274,23.1,50,"autem","patek",2021,2027-07-30
+"D00141","Veltrusy","ucilisni obor",196,27.4,22,"kolo","pondeli",2021,2027-03-30
+"D00142","Neratovice","zakladni skola",48,11,23,"kolo","pondeli",2021,2027-11-30
+"D00143","Kralupy nad Vltavou","zakladni skola",294,7.9,75,"MHD","streda",2021,2026-10-30
+"D00144","Kladno","stredni skola",165,2.2,11,"kolo","patek",2021,2026-11-30
+"D00145","Kralupy nad Vltavou","stredni skola",475,NA,63,"pesky","patek",2021,2027-07-30
+"D00146","Roudnice nad Labem","zakladni skola",72,23.7,48,"kolo","streda",2021,2026-09-30
+"D00147","Velvary","ucilisni obor",257,NA,61,"pesky","streda",2021,2027-10-30
+"D00148","Kralupy nad Vltavou","zakladni skola",272,5.8,50,"autem","patek",2021,2026-12-30
+"D00149","Neratovice","zakladni skola",343,10.3,4,"MHD","patek",2021,2026-10-30
+"D00150","Neratovice","stredni skola",290,14.4,4,"vlak","pondeli",2021,2027-12-30
+"D00151","Neratovice","ucilisni obor",209,11.4,74,"autem","pondeli",2021,2027-11-30
+"D00152","Mounotov","ucilisni obor",72,5,24,"MHD","patek",2021,2027-08-30
+"D00153","Veltrusy","ucilisni obor",341,19.3,74,"autem","pondeli",2021,2027-06-30
+"D00154","Velvary","zakladni skola",176,12.3,14,"vlak","pondeli",2021,2027-12-30
+"D00155","Mounotov","ucilisni obor",475,6.7,60,"kolo","streda",2021,2027-11-30
+"D00156","Velvary","ucilisni obor",244,7.2,13,"autem","streda",2021,2027-08-30
+"D00157","Melnik","ucilisni obor",468,16.7,51,"MHD","patek",2021,2027-04-30
+"D00158","Mounotov","ucilisni obor",70,22.9,15,"autem","patek",2021,2026-07-30
+"D00159","Veltrusy","ucilisni obor",32,24.4,34,"MHD","patek",2021,2027-06-30
+"D00160","Veltrusy","ucilisni obor",380,9.5,67,"autem","patek",2021,2027-04-30
+"D00161","Roudnice nad Labem","stredni skola",348,17.8,68,"autem","pondeli",2021,2027-07-30
+"D00162","Veltrusy","ucilisni obor",123,24.7,27,"MHD","pondeli",2021,2027-11-30
+"D00163","Roudnice nad Labem","zakladni skola",52,5.3,42,"autem","patek",2021,2026-07-30
+"D00164","Kladno","stredni skola",479,25.5,69,"autem","pondeli",2021,2027-11-30
+"D00165","Velvary","stredni skola",103,11.2,14,"MHD","patek",2021,2027-05-30
+"D00166","Roudnice nad Labem","ucilisni obor",337,27.6,29,"autem","patek",2021,2027-09-30
+"D00167","Mounotov","ucilisni obor",58,16.7,7,"kolo","streda",2021,2027-11-30
+"D00168","Veltrusy","zakladni skola",147,11.5,57,"vlak","patek",2021,2027-11-30
+"D00169","Velvary","ucilisni obor",118,14,46,"autem","streda",2021,2027-03-02
+"D00170","Kralupy nad Vltavou","ucilisni obor",292,2.3,71,"autem","patek",2021,2026-07-30
+"D00171","Roudnice nad Labem","stredni skola",69,23.8,21,"pesky","streda",2021,2026-07-30
+"D00172","Veltrusy","ucilisni obor",83,0.5,9,"kolo","patek",2021,2026-07-30
+"D00173","Melnik","zakladni skola",317,24.5,73,"kolo","streda",2021,2026-10-30
+"D00174","Slany","zakladni skola",417,17,21,"vlak","patek",2021,2027-01-30
+"D00175","Kralupy nad Vltavou","stredni skola",370,27.3,16,"autem","patek",2021,2026-08-30
+"D00176","Kladno","stredni skola",206,9.2,28,"autem","pondeli",2021,2027-09-30
+"D00177","Melnik","stredni skola",370,17.4,30,"MHD","streda",2021,2026-10-30
+"D00178","Roudnice nad Labem","stredni skola",456,17.4,52,"kolo","patek",2021,2027-05-30
+"D00179","Neratovice","stredni skola",59,5,39,"kolo","pondeli",2021,2026-12-30
+"D00180","Slany","stredni skola",138,NA,68,"pesky","pondeli",2021,2026-10-30
+"D00181","Slany","stredni skola",331,22.3,33,"autem","streda",2021,2026-11-30
+"D00182","Kralupy nad Vltavou","zakladni skola",181,21.4,73,"autem","streda",2021,2026-06-30
+"D00183","Roudnice nad Labem","ucilisni obor",12,11.7,19,"pesky","streda",2021,2027-11-30
+"D00184","Mounotov","stredni skola",276,4.8,47,"pesky","pondeli",2021,2026-08-30
+"D00185","Veltrusy","ucilisni obor",70,12,33,"MHD","streda",2021,2026-09-30
+"D00186","Neratovice","ucilisni obor",204,24.5,59,"kolo","pondeli",2021,2027-11-30
+"D00187","Kralupy nad Vltavou","zakladni skola",477,20.8,54,"autem","patek",2021,2027-04-30
+"D00188","Litomerice","ucilisni obor",367,8.1,11,"vlak","patek",2021,2027-03-02
+"D00189","Velvary","ucilisni obor",159,4.2,41,"vlak","patek",2021,2027-11-30
+"D00190","Kralupy nad Vltavou","zakladni skola",326,3.2,69,"autem","patek",2021,2027-03-02
+"D00191","Melnik","zakladni skola",417,23.1,61,"MHD","streda",2021,2026-08-30
+"D00192","Slany","zakladni skola",45,27.3,11,"autem","streda",2021,2027-06-30
+"D00193","Veltrusy","ucilisni obor",448,2.6,61,"autem","pondeli",2021,2027-01-30
+"D00194","Mounotov","zakladni skola",459,9.7,76,"MHD","streda",2021,2027-05-30
+"D00195","Roudnice nad Labem","stredni skola",359,2.6,71,"kolo","streda",2021,2027-12-30
+"D00196","Veltrusy","ucilisni obor",292,23,3,"kolo","pondeli",2021,2026-06-30
+"D00197","Slany","stredni skola",216,9.6,25,"MHD","streda",2021,2026-06-30
+"D00198","Mounotov","zakladni skola",196,2.1,19,"pesky","streda",2021,2027-05-30
+"D00199","Mounotov","zakladni skola",322,11.3,34,"kolo","streda",2021,2026-06-30
+"D00200","Roudnice nad Labem","stredni skola",15,7,51,"autem","streda",2021,2027-08-30
+"D00201","Melnik","zakladni skola",39,2.4,64,"autem","pondeli",2021,2027-05-30
+"D00202","Slany","stredni skola",275,15.5,35,"vlak","pondeli",2021,2026-09-30
+"D00203","Kladno","zakladni skola",319,2.6,45,"MHD","pondeli",2021,2026-11-30
+"D00204","Melnik","stredni skola",98,17.6,53,"MHD","streda",2021,2026-08-30
+"D00205","Veltrusy","ucilisni obor",379,26.7,8,"autem","patek",2021,2027-11-30
+"D00206","Veltrusy","ucilisni obor",271,4.9,16,"autem","pondeli",2021,2026-07-30
+"D00207","Roudnice nad Labem","ucilisni obor",42,NA,66,"pesky","pondeli",2021,2026-12-30
+"D00208","Slany","ucilisni obor",364,9.3,8,"pesky","pondeli",2021,2026-12-30
+"D00209","Mounotov","ucilisni obor",254,22.1,46,"vlak","pondeli",2021,2027-03-02
+"D00210","Velvary","zakladni skola",232,19.4,44,"MHD","patek",2021,2027-05-30
+"D00211","Mounotov","stredni skola",86,5.1,70,"vlak","patek",2021,2027-08-30
+"D00212","Kralupy nad Vltavou","stredni skola",434,14.1,75,"autem","streda",2021,2026-11-30
+"D00213","Litomerice","zakladni skola",435,19.5,29,"autem","streda",2021,2026-12-30
+"D00214","Mounotov","ucilisni obor",403,23,77,"autem","streda",2021,2027-10-30
+"D00215","Veltrusy","zakladni skola",209,17.8,17,"pesky","streda",2021,2027-06-30
+"D00216","Melnik","zakladni skola",39,17.3,62,"MHD","streda",2021,2027-12-30
+"D00217","Velvary","ucilisni obor",161,21.4,5,"pesky","patek",2021,2026-10-30
+"D00218","Velvary","ucilisni obor",75,23.1,12,"MHD","pondeli",2021,2027-10-30
+"D00219","Kladno","ucilisni obor",70,15.6,36,"autem","patek",2021,2027-07-30
+"D00220","Neratovice","stredni skola",166,20.2,74,"autem","pondeli",2021,2026-09-30
+"D00221","Neratovice","zakladni skola",352,20.5,60,"autem","streda",2021,2027-05-30
+"D00222","Neratovice","ucilisni obor",383,9.4,47,"MHD","patek",2021,2027-12-30
+"D00223","Velvary","zakladni skola",478,10.6,39,"autem","patek",2021,2027-04-30
+"D00224","Velvary","stredni skola",471,17,14,"autem","pondeli",2021,2027-11-30
+"D00225","Velvary","ucilisni obor",258,7.8,55,"kolo","pondeli",2021,2027-05-30
+"D00226","Kladno","stredni skola",422,22.2,59,"autem","pondeli",2021,2027-10-30
+"D00227","Kralupy nad Vltavou","stredni skola",190,7.4,46,"MHD","pondeli",2021,2027-11-30
+"D00228","Kralupy nad Vltavou","stredni skola",93,1.5,73,"autem","patek",2021,2027-11-30
+"D00229","Veltrusy","stredni skola",421,13.2,38,"autem","patek",2021,2027-12-30
+"D00230","Litomerice","zakladni skola",285,24.9,20,"pesky","streda",2021,2026-08-30
+"D00231","Neratovice","zakladni skola",426,6.5,68,"autem","streda",2021,2027-09-30
+"D00232","Roudnice nad Labem","zakladni skola",236,NA,70,"pesky","pondeli",2021,2027-05-30
+"D00233","Melnik","zakladni skola",74,3.3,5,"vlak","patek",2021,2027-08-30
+"D00234","Neratovice","zakladni skola",193,11.8,17,"autem","patek",2021,2027-11-30
+"D00235","Veltrusy","stredni skola",158,5.5,36,"autem","pondeli",2021,2027-08-30
+"D00236","Kralupy nad Vltavou","stredni skola",179,13.9,55,"vlak","streda",2021,2027-10-30
+"D00237","Slany","zakladni skola",86,13.5,36,"pesky","streda",2021,2027-05-30
+"D00238","Roudnice nad Labem","stredni skola",48,10.9,34,"pesky","patek",2021,2027-03-02
+"D00239","Kladno","zakladni skola",282,12.8,37,"vlak","streda",2021,2027-12-30
+"D00240","Roudnice nad Labem","ucilisni obor",269,5.4,28,"MHD","pondeli",2021,2027-06-30
+"D00241","Veltrusy","zakladni skola",195,6.6,28,"autem","patek",2021,2027-09-30
+"D00242","Slany","zakladni skola",112,22.9,38,"MHD","streda",2021,2027-12-30
+"D00243","Kladno","zakladni skola",424,26.2,42,"autem","patek",2021,2027-04-30
+"D00244","Neratovice","zakladni skola",256,2,73,"autem","patek",2021,2027-05-30
+"D00245","Melnik","zakladni skola",233,27.3,9,"vlak","pondeli",2021,2026-08-30
+"D00246","Kladno","zakladni skola",335,25.2,9,"autem","pondeli",2021,2027-04-30
+"D00247","Veltrusy","zakladni skola",113,20.1,11,"autem","streda",2021,2027-06-30
+"D00248","Melnik","stredni skola",293,19.5,53,"MHD","streda",2021,2027-05-30
+"D00249","Kralupy nad Vltavou","ucilisni obor",439,2.6,26,"autem","pondeli",2021,2027-03-30
+"D00250","Mounotov","stredni skola",96,21.6,40,"kolo","patek",2021,2027-12-30
+"D00251","Velvary","ucilisni obor",320,18.8,34,"autem","pondeli",2021,2026-10-30
+"D00252","Slany","ucilisni obor",151,21.4,38,"MHD","streda",2021,2027-01-30
+"D00253","Slany","stredni skola",14,12,29,"vlak","streda",2021,2027-03-02
+"D00254","Veltrusy","stredni skola",243,7.9,51,"vlak","pondeli",2021,2026-08-30
+"D00255","Roudnice nad Labem","zakladni skola",465,19,52,"autem","patek",2021,2027-11-30
+"D00256","Velvary","stredni skola",95,15,54,"autem","patek",2021,2027-12-30
+"D00257","Neratovice","ucilisni obor",334,5.2,13,"MHD","streda",2021,2026-08-30
+"D00258","Slany","zakladni skola",148,5.2,33,"kolo","streda",2021,2027-09-30
+"D00259","Litomerice","zakladni skola",411,14.4,77,"autem","streda",2021,2026-11-30
+"D00260","Melnik","stredni skola",393,20.3,25,"vlak","patek",2021,2027-09-30
