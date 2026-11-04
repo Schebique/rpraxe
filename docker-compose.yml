@@ -29,7 +29,8 @@ services:
     env_file: [rpraxe.env]
     volumes:
       - ./state:/data/state
-      - ./datasets:/data/datasets:ro
+      # app smí do dat zapisovat (nahrání CSV učitelem); runner je má dál jen pro čtení
+      - ./datasets:/data/datasets
     ports:
       # přes .env: doma 172.20.0.1 (brána je macvlan), jinak stačí 127.0.0.1
       - "${RPRAXE_BIND:-127.0.0.1}:${RPRAXE_PORT:-8710}:8080"

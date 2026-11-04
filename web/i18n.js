@@ -280,3 +280,57 @@ Object.assign(I18N_ATTR, {
     "např. Skupina A — úterý": "napr. Skupina A — utorok",
   }),
 });
+
+Object.assign(I18N.en, {
+  "žáci ve třídě — klikni, kdo do ní patří": "students in the class — click who belongs",
+  "smazat třídu": "delete class", "Opravdu smazat třídu": "Really delete the class",
+  "Napiš aspoň název třídy.": "At least write a class name.",
+  "Vytvořit vlastní úlohu": "Write your own task", "Vlastní úloha": "Own task",
+  "Nová úloha": "New task", "Úprava úlohy": "Editing task", "žáků": "students",
+  "Učitel může mít tříd víc a stejného žáka zařadit do dvou. Třídu smažeš tlačítkem u ní.":
+    "A teacher can run several classes and put the same student in two of them. Delete a class with its button.",
+});
+Object.assign(I18N.sk, {
+  "smazat třídu": "zmazať triedu", "Opravdu smazat třídu": "Naozaj zmazať triedu",
+  "Vytvořit vlastní úlohu": "Vytvoriť vlastnú úlohu", "Vlastní úloha": "Vlastná úloha",
+  "Nová úloha": "Nová úloha", "Úprava úlohy": "Úprava úlohy",
+});
+
+Object.assign(I18N.en, {
+  "Vlastní úlohy": "Your own tasks",
+  "Úlohu napsat nebo upravit jde z dialogu — ať jsi kdekoli. Uložit se dá jen taková, která projde vlastním řešením.":
+    "The editor is a dialog, so it opens from anywhere. Only a task that passes its own solution can be saved.",
+  "Vlastní banka na GitHubu": "Your own task bank on GitHub",
+  "načíst z GitHubu": "load from GitHub",
+  "stahuji a přezkouším…": "downloading and re-checking…",
+  "přeneseno": "imported", "schváleno": "approved", "koncept": "draft", "schováno": "retired",
+  "Vlož odkaz na repozitář nebo na soubor ukoly.json.": "Paste a repository link or a link to ukoly.json.",
+  "nechat opravit modelem": "let the model fix it",
+  "model přepisuje úlohu, ať projde…": "the model is rewriting the task so that it passes…",
+  "přepsáno a ověřeno": "rewritten and verified",
+  "po přepsání to pořád neprochází": "it still does not pass after the rewrite",
+  "Napiš aspoň název třídy.": "Write at least a class name.",
+  "Opravdu smazat třídu": "Really delete the class",
+  "smazat": "delete",
+});
+
+Object.assign(I18N.sk, {
+  "Vlastní úlohy": "Vlastné úlohy", "Vlastní banka na GitHubu": "Vlastná banka úloh na GitHube",
+  "načíst z GitHubu": "načítať z GitHubu", "nechat opravit modelem": "nechať opraviť modelom",
+  "přeneseno": "preneseno", "koncept": "koncept", "smazat": "zmazať",
+});
+
+Object.assign(I18N.en, {
+  "zahodit": "discard", "obnovit": "restore", "zahozeno": "discarded",
+  "tvůj koncept": "your draft", "+ vlastní úlohu": "+ write your own",
+  "nahrát data": "upload data", "nahávám data…": "uploading data…",
+  "data nahrána": "data uploaded", "do dneška": "add to today",
+  "úloha je zpátky": "the task is back", "_banka_dat": "Data bank",
+});
+
+Object.assign(I18N.sk, {
+  "zahodit": "zahodiť", "obnovit": "obnoviť", "zahozeno": "zahodené",
+  "tvůj koncept": "tvoj koncept", "+ vlastní úlohu": "+ vlastná úloha",
+  "nahrát data": "nahrať dáta", "do dneška": "do dneška",
+  "úloha je zpátky": "úloha je späť",
+});

@@ -43,6 +43,8 @@ def chybejici_prvky(html: str, js: str) -> list[str]:
     """
     exists = set(re.findall(r'id="([^"]+)"', html)) | set(re.findall(r'id="([^"]+)"', js))
     exists |= set(re.findall(r'''\.id\s*=\s*["']([\w-]+)''', js))       # prvky, které JS vytvoří sám
+    # id sestavené v šabloně: id="${i("gh-url")}" — název je uvnitř výrazu
+    exists |= set(re.findall(r'''id="\$\{[^{}]*["']([\w-]+)["']''', js))
     nacteno = set(re.findall(r"""(?:querySelector|querySelectorAll)\(\s*[\"']#([A-Za-z][\w-]*)""", js))
     nacteno |= set(re.findall(r"""\$\(\s*[\"']#([A-Za-z][\w-]*)""", js))
     return [f"#{i} si app.js volá, ale nikde takový prvek není" for i in sorted(nacteno - exists)]

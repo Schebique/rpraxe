@@ -94,6 +94,17 @@ def init() -> None:
                   INSERT OR IGNORE INTO skill_labels(key, label, lesson)
                     SELECT key, label, lesson FROM skills_old;""")
                 print("[rpraxe] schema: odhady dovedností rozděleny podle účtů", flush=True)
+        migrace(c)
+
+
+def migrace(c: sqlite3.Connection) -> None:
+    """Doplní, co přibylo s novými funkcemi — stará databáze zůstane čitelná."""
+    sloupce = {r["name"] for r in c.execute("PRAGMA table_info(tasks)")}
+    if "owner" not in sloupce:
+        c.execute("ALTER TABLE tasks ADD COLUMN owner TEXT DEFAULT ''")
+    # vlastní „zahodit“ je věc každého žáka — úloha se nikam nesmí smazat globally
+    c.execute("CREATE TABLE IF NOT EXISTS dropped("
+              "user TEXT, task TEXT, ts REAL, PRIMARY KEY(user, task))")
 
 
 PREF_DEFAULTS = {"val": 20, "focus": "", "theme": "auto", "model": "", "lang": "cs"}
@@ -137,16 +148,17 @@ def row_to_task(r: sqlite3.Row) -> dict:
 def upsert_task(c: sqlite3.Connection, t: dict) -> None:
     c.execute(
         """INSERT INTO tasks(id,title,lesson,minutes,level,skills,dataset,nacti,starter,zadani,
-                             check_r,reseni,hints,status,source,created,note)
+                             check_r,reseni,hints,status,source,created,note,owner)
            VALUES(:id,:title,:lesson,:minutes,:level,:skills,:dataset,:nacti,:starter,:zadani,
-                 :check_r,:reseni,:hints,:status,:source,:created,:note)
+                 :check_r,:reseni,:hints,:status,:source,:created,:note,:owner)
            ON CONFLICT(id) DO UPDATE SET
              title=excluded.title, lesson=excluded.lesson, minutes=excluded.minutes,
              level = CASE WHEN excluded.level = 1 THEN tasks.level ELSE excluded.level END,
              skills=excluded.skills, dataset=excluded.dataset,
              nacti=excluded.nacti, starter=excluded.starter, zadani=excluded.zadani,
              check_r=excluded.check_r, reseni=excluded.reseni, hints=excluded.hints,
-             status=excluded.status, source=excluded.source, note=excluded.note""",
+             status=excluded.status, source=excluded.source, note=excluded.note,
+             owner=CASE WHEN excluded.owner = '' THEN tasks.owner ELSE excluded.owner END""",
         {
             "id": t["id"], "title": t.get("title", t["id"]), "lesson": int(t.get("lesson") or 0),
             "minutes": int(t.get("minutes") or 4), "level": float(t.get("level") or 1),
@@ -155,9 +167,24 @@ def upsert_task(c: sqlite3.Connection, t: dict) -> None:
             "zadani": t.get("zadani", ""), "check_r": t.get("check") or t.get("check_r") or "",
             "reseni": t.get("reseni") or "", "hints": json.dumps(t.get("hints") or [], ensure_ascii=False),
             "status": t.get("status", "approved"), "source": t.get("source", "bank"),
+            # "owner" má jen to, co si člověk vytvořil sám (žákova úloha, AI pro něj)
+            "owner": t.get("owner") or "",
             "created": t.get("created") or time.time(), "note": t.get("note", ""),
         },
     )
+
+
+def dropped_for(c: sqlite3.Connection, user: str) -> set[str]:
+    """Úlohy, které si člověk osobně zahodil — nikoho jiného se to netýká."""
+    return {r["task"] for r in c.execute("SELECT task FROM dropped WHERE user = ?", (user,))}
+
+
+def set_dropped(c: sqlite3.Connection, user: str, uloha: str, zahodit: bool) -> None:
+    if zahodit:
+        c.execute("INSERT OR REPLACE INTO dropped(user,task,ts) VALUES(?,?,?)",
+                  (user, uloha, time.time()))
+    else:
+        c.execute("DELETE FROM dropped WHERE user = ? AND task = ?", (user, uloha))
 
 
 def record_attempt(c: sqlite3.Connection, **kw) -> None:

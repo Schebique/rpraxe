@@ -72,6 +72,41 @@ docker compose exec -d app /opt/venv/bin/python /srv/scripts/validate.py \
 tail -f state/validace.log
 ```
 
+## Přenos banky: odkaz, soubor, export
+
+Knihovna (Učitel → Knihovna, Správa → Banka úloh) umí úlohy **přenést dovnitř i ven**:
+
+| cesta | jak | co se stane |
+|---|---|---|
+| odkaz | vložíš URL na `ukoly.json` (GitHub, raw, gist, `user/repo`) | stáhne se, přepíše cizí klíče, přepočítá `id` |
+| soubor | vybereš `*.json` z počítače | stejná cesta, jen bez stahování |
+| export | celá banka / právě vyfiltrovaná / jen vybrané | JSON, který se tímž tlačítkem vrátí zpátky |
+
+Přenesené úlohy se **samozřetězně ověří**: `reseni` se pustí v sandboxu a musí
+projít vlastní `check`. Co projde, je hned `approved`; co ne, zůstává `draft`
+s poznámkou, proč to neprošlo. Učitel pak v bance vidí obojí a koncept buď
+doplní, nebo zahodí. Limit je 200 úloh na přenos a 900 kB souboru.
+
+Opakovaný přenos téhož souboru úlohy **upgraduje podle `id`**, nedělá dvojčata.
+
+## Data k úlohám (dataset)
+
+Dataset **není součástí JSONu** — úloha v sobě má jen jméno souboru
+(`"dataset": "zkousky.csv"`) a `nacti` kód, který ho čte ze stejného jména.
+Data jsou větší, může jich užít víc úloh a žák je dostává sandboxem.
+
+Nahrávají se vedle úlohy, v editoru i v bance:
+
+* tlačítko *nahrat data* pošle `.csv`, `.tsv` nebo `.txt` do `datasets/`,
+* při přenosu JSONu lze přiložit rovnou i řádky (`"data": [{...}, ...]`) —
+  server z nich ten soubor sepíše a pojmenuje ho podle pole `dataset`,
+* export volbou *včetně dat* přibalí obsah souboru k každé úloze, takže se
+  banka i s daty přenese na jinou instalaci,
+* soubor, na který ještě něco ukazuje, mazání odmítne (ať se úloha neraZboří).
+
+Formát: první řádek hlavička se jmény sloupců, dál stejný počet sloupců.
+Jiný počet sloupců se oznámí i s číslem řádku, aby bylo kam sahat.
+
 ## Noční autor (nepovinné)
 
 `agent/nightly.py` nechá lokální model napsat nové úlohy a **než je pustí do

@@ -190,7 +190,7 @@ def build_script(req: RunReq) -> str:
         "  } else if (is.null(.chk)) {\n"
         "    .rep$check <- list(pass = TRUE, msg = \"kontrola proběhla bez výhrad\")\n"
         "  } else {\n"
-        "    .rep$check <- list(pass = NA, msg = paste(\"kontrola nevrátila TRUE/FALSE, dostalo se:\", class(.chk)[1]))\n"
+        "    .rep$check <- list(pass = NA, msg = paste(\"kontrola nevrátila jediné TRUE/FALSE — dostalo se:\", class(.chk)[1], \"o\", length(.chk), \"hodnotách. Kontrola má vrátit jediné TRUE nebo FALSE — použij && a ne &.\"))\n"
         "  }\n"
         "}\n"
         "\n# --- grafy -------------------------------------------------------------\n"

@@ -10,8 +10,12 @@ Role
 """
 from __future__ import annotations
 
+import csv
+import httpx
+import io
 import json
 import os
+import re
 import shutil
 import sqlite3
 import time
@@ -61,6 +65,24 @@ class PrihlaseniBody(BaseModel):
     tajemstvi: str | None = None
     role_z_skupin: dict | None = None
     povolene_ucety: list[str] | None = None
+
+
+class DatasetBody(BaseModel):
+    """CSV, které učitel nahraje z počítače a úloha se na něj pak odkáže."""
+    jmeno: str
+    data: str
+    prepsat: bool = False
+
+
+class ImportBody(BaseModel):
+    """Text souboru s úlohami — klient načte JSON z disku a pošle ho jako řetězec."""
+    data: str
+    jmeno: str = "soubor.json"
+
+
+class GithubBody(BaseModel):
+    odkaz: str
+    ref: str = "main"
 
 
 class RestoreBody(BaseModel):
@@ -117,6 +139,180 @@ def _prihlaseni_pro_ui() -> dict:
             "popis": ("přihlašování přes bránu je zapnuté — účet se založí sám podle hlavičky"
                       if zapnuto else
                       "přihlašuje se jen heslem — SSO zapneš níže v kartě Přihlašování")}
+
+
+# ------------------------------------------------------ datové soubory (vlastní)
+_ADRESAR_DAT = os.environ.get("RPRAXE_DATASETS", "/data/datasets")
+_POVOLENE_PRIPONY = (".csv", ".tsv", ".txt")
+_MEZNIK_DAT = 4_000_000
+
+
+def _jmeno_souboru(jmeno: str) -> str:
+    """Důsledné jméno souboru — žádná cesta, žádná tečka za jménem adresáře."""
+    ciste = Path((jmeno or "").strip()).name
+    if not ciste or ciste.startswith("."):
+        raise HTTPException(422, "soubor potřebuje jméno, třeba zkousky.csv")
+    if not ciste.lower().endswith(_POVOLENE_PRIPONY):
+        raise HTTPException(422, "dovedu jen .csv, .tsv a .txt — a úloha pak čte "
+                                 "stejné jméno, jaké tu napíšeš")
+    if len(ciste) > 64:
+        raise HTTPException(422, "jméno je moc dlouhé (max 64 znaků)")
+    return ciste
+
+
+def _cesta_k_datum(jmeno: str) -> Path:
+    root = Path(_ADRESAR_DAT).resolve()
+    cesta = (root / jmeno).resolve()
+    if root not in cesta.parents:
+        raise HTTPException(422, "tohle není soubor v adresáři dat")
+    return cesta
+
+
+def _prepis_csv(text: str, cesta_k: Path) -> tuple[int, list[str]]:
+    """Zkontroluje, že je to čitelná tabulka, a zapíše ji; vrátí řádky a sloupce."""
+    oddelovac = "\t" if cesta_k.suffix.lower() == ".tsv" else ","
+    nacteno = list(csv.reader(io.StringIO(text), delimiter=oddelovac))
+    nacteno = [r for r in nacteno if any(str(b).strip() for b in r)]
+    if len(nacteno) < 2:
+        raise HTTPException(422, "v souboru není ani hlavička a jeden řádek dat")
+    sirka = len(nacteno[0])
+    if sirka < 1:
+        raise HTTPException(422, "první řádek musí obsahovat názvy sloupců")
+    if any(len(r) != sirka for r in nacteno[1:]):
+        chybny = next(i for i, r in enumerate(nacteno[1:], start=2) if len(r) != sirka)
+        raise HTTPException(422, "na řádku %d je jiný počet sloupců než v hlavičce (%d)"
+                                    % (chybny, sirka))
+    cesta_k.write_text(text.replace("\r\n", "\n").lstrip("\ufeff"), encoding="utf-8")
+    return len(nacteno) - 1, [str(b).strip() for b in nacteno[0]]
+
+
+def _uloz_data(jmeno: str, polozka: dict) -> str | None:
+    """Součástí importu může být i rovnou obsah dat — pole řádků, nebo CSV text."""
+    if not jmeno:
+        return None
+    cesta_k = _cesta_k_datum(jmeno)
+    if cesta_k.is_file():
+        return None
+    csv_text = polozka.get("csv") or polozka.get("data_csv") or ""
+    radky = polozka.get("data")
+    if not csv_text and isinstance(radky, list) and radky and isinstance(radky[0], dict):
+        sloupce = list(radky[0].keys())
+        buffer = io.StringIO()
+        zapis = csv.DictWriter(buffer, fieldnames=sloupce)
+        zapis.writeheader()
+        for radek in radky:
+            zapis.writerow({k: radek.get(k, "") for k in sloupce})
+        csv_text = buffer.getvalue()
+    if not str(csv_text).strip():
+        return None
+    if len(csv_text) > _MEZNIK_DAT:
+        raise HTTPException(422, "vložená data jsou moc velké (max 4 MB na soubor)")
+    _prepis_csv(str(csv_text), cesta_k)
+    return cesta_k.name
+
+
+# --------------------------------------------------------- pomoci s GitHubem
+_GITHUB_RE = re.compile(
+    r"github[.]com[/:](?P<vlastnik>[\w.-]+)/(?P<repo>[\w.-]+?)(?:[.]git)?"
+    r"(?:/(?:tree|blob)/(?P<ref>[^/]+)/(?P<cesta>.+?))?/?$", re.I)
+_RAW_RE = re.compile(
+    r"(?:raw|gist)[.]githubusercontent[.]com/(?P<vlastnik>[\w.-]+)/(?P<repo>[\w.-]+?)/"
+    r"(?P<ref>[^/]+)/(?P<cesta>.+?)$", re.I)
+_KRATKY_RE = re.compile(r"^(?P<vlastnik>[\w.-]+)/(?P<repo>[\w.-]+?)(?:/(?P<cesta>.+))?$")
+
+
+def _rozloz_github(odkaz: str) -> tuple[str, str, str, str] | None:
+    """Z odkazu vybere vlastníka, repozitář, větev a cestu k souboru."""
+    odkaz = (odkaz or "").strip().rstrip("/")
+    if not odkaz:
+        return None
+    nalez = _RAW_RE.search(odkaz)
+    if nalez:
+        return (nalez.group("vlastnik"), nalez.group("repo"), nalez.group("ref"),
+                nalez.group("cesta"))
+    nalez = _GITHUB_RE.search(odkaz)
+    if not nalez:
+        nalez = _KRATKY_RE.match(odkaz)
+        if not nalez:
+            return None
+        return (nalez.group("vlastnik"), nalez.group("repo"), "", nalez.group("cesta") or "")
+    return (nalez.group("vlastnik"), nalez.group("repo"), nalez.group("ref") or "",
+            nalez.group("cesta") or "")
+
+
+async def _stahni_github(vlastnik: str, rep: str, ref: str, cesta: str,
+                         prima_adresa: str = "") -> object:
+    """Stáhne JSON z raw.githubusercontent.com; zkusí i main/master a index souborů."""
+    kandidati = [(ref, cesta)]
+    if ref == "main":
+        kandidati.append(("master", cesta))
+    if not cesta:
+        kandidati = [(r, c) for r, c in kandidati for c in ("ukoly.json", "tasks.json", "ulohy.json")]
+    if prima_adresa:
+        kandidati.insert(0, ("", ""))
+    naposledy = None
+    for poradi, (vetev, cesta_v) in enumerate(kandidati):
+        adresa = prima_adresa if (poradi == 0 and prima_adresa) else \
+            f"https://raw.githubusercontent.com/{vlastnik}/{rep}/{vetev}/{cesta_v}"
+        async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
+            odpoved = await client.get(adresa)
+        if odpoved.status_code == 200:
+            try:
+                return odpoved.json()
+            except ValueError:
+                raise HTTPException(422, "na %s není platný JSON" % adresa)
+        naposledy = "%s → HTTP %s" % (adresa, odpoved.status_code)
+    raise HTTPException(422, "soubor s úlohami jsem nenašel (%s)" % naposledy)
+
+
+_PREKLAD = {"title": "title", "nadpis": "title", "nazev": "title", "název": "title",
+            "zadani": "zadani", "zadání": "zadani", "task": "zadani",
+            "reseni": "reseni", "řešení": "reseni", "solution": "reseni",
+            "check": "check", "kontrola": "check",
+            "starter": "starter", "kostka": "starter", "kostra": "starter",
+            "nacti": "nacti", "načti": "nacti",
+            "dataset": "dataset", "id": "id", "note": "note",
+            "lesson": "lesson", "lekce": "lesson", "lekce": "lesson",
+            "minutes": "minutes", "minuty": "minutes", "minuty": "minutes",
+            "level": "level", "obtiznost": "level", "obtížnost": "level"}
+
+
+def _normalizuj_ulohu(polozka: dict, poradi: int, zdroj: str, kdo: str) -> dict | None:
+    """Jedna položka ze souboru → záznam úlohy; tolerantní k českým i anglickým klíčům."""
+    uloha = {}
+    for klic, hodnota in polozka.items():
+        cil = _PREKLAD.get(str(klic).strip().lower())
+        if cil and hodnota not in (None, "", []):
+            uloha[cil] = hodnota
+    if not uloha.get("zadani") or not uloha.get("reseni"):
+        return None
+    if isinstance(uloha.get("zadani"), (list, tuple)):
+        uloha["zadani"] = "\n".join(str(r) for r in uloha["zadani"])
+    dovednosti = polozka.get("skills") or polozka.get("dovednosti") or []
+    if isinstance(dovednosti, str):
+        dovednosti = [d.strip() for d in dovednosti.split(",") if d.strip()]
+    napovedy = polozka.get("hints") or polozka.get("napovedy") or polozka.get("nápovědy") or []
+    if isinstance(napovedy, str):
+        napovedy = [napovedy]
+    cislo = lambda k, v: float(uloha.get(k) if str(uloha.get(k, "")).replace(".", "", 1).isdigit() else v)
+    # id se odvozuje od posledního slova zdroje (název repa, nebo souboru) — ať je
+    # krátké a stejné, když tenž soubor přenesu příště
+    zaklad = re.sub(r"[^a-z0-9]+", "-", zdroj.lower().split(":")[-1].split("/")[-1])
+    zaklad = re.sub(r"-+", "-", zaklad).strip("-")
+    for privlastek in ("-json", "-csv"):
+        zaklad = zaklad.removesuffix(privlastek)
+    zaklad = zaklad[:18] or "uloha"
+    return {
+        "id": str(uloha.get("id") or ("%s-%02d" % (zaklad, poradi + 1)))[:40],
+        "title": str(uloha.get("title") or uloha["zadani"][:60])[:120],
+        "lesson": int(cislo("lesson", 0)), "minutes": int(cislo("minutes", 4)),
+        "level": cislo("level", 2.0), "skills": list(dovednosti)[:6],
+        "dataset": uloha.get("dataset"), "nacti": str(uloha.get("nacti") or ""),
+        "zadani": str(uloha["zadani"]), "reseni": str(uloha["reseni"]),
+        "check": str(uloha.get("check") or ""), "starter": str(uloha.get("starter") or ""),
+        "hints": [str(h) for h in napovedy][:5], "status": "draft", "source": zdroj,
+        "note": str(uloha.get("note") or "")[:400], "created": time.time(),
+    }
 
 
 def register(app: APIRouter, ctx) -> None:
@@ -439,7 +635,7 @@ def register(app: APIRouter, ctx) -> None:
         kdo, role = staff(request)
         name = (body.name or "").strip()
         if not name:
-            raise HTTPException(422, "trída potřebuje jméno")
+            raise HTTPException(422, "třída potřebuje název")
         if len(name) > 60:
             raise HTTPException(422, "jméno je moc dlouhé")
         zaci = [z.strip() for z in (body.zaci or []) if z.strip()]
@@ -452,7 +648,7 @@ def register(app: APIRouter, ctx) -> None:
             if identification:
                 stajici = next((k for k in store.classes(c) if k["id"] == identification), None)
                 if not stajici:
-                    raise HTTPException(404, "taková trída není")
+                    raise HTTPException(404, "taková třída není")
                 if stajici["teacher"] != kdo and role != "admin":
                     raise HTTPException(403, "tuhle třídu nevedeš")
                 teacher = stajici["teacher"] if role != "admin" else (body.ucitel or stajici["teacher"])
@@ -460,7 +656,7 @@ def register(app: APIRouter, ctx) -> None:
                 teacher = kdo
                 identification = store.new_class_id(c)
             trida = store.save_class(c, identification, name, teacher, (body.poznamka or "").strip(), zaci)
-        provozni_log("trída %s (%s) uložena %s, žáků %d" % (identification, name, kdo, len(zaci)))
+        provozni_log("třída %s (%s) uložena %s, žáků %d" % (identification, name, kdo, len(zaci)))
         return {"ok": True, "trida": trida}
 
     @router.delete("/api/classes/{identification}")
@@ -469,14 +665,169 @@ def register(app: APIRouter, ctx) -> None:
         with ctx.db() as c:
             stajici = next((k for k in store.classes(c) if k["id"] == identification), None)
             if not stajici:
-                raise HTTPException(404, "taková trída není")
+                raise HTTPException(404, "taková třída není")
             if stajici["teacher"] != kdo and role != "admin":
                 raise HTTPException(403, "tuhle třídu nevedeš")
             store.drop_class(c, identification)
-        provozni_log("trída %s smazána %s" % (identification, kdo))
+        provozni_log("třída %s smazána %s" % (identification, kdo))
         return {"ok": True}
 
+    @router.get("/api/admin/datasets")
+    def api_datasets_seznam(request: Request):
+        """Co je v adresáři dat — i s velikostí, ať je vidět, co se nahraje."""
+        staff(request)
+        root = Path(_ADRESAR_DAT)
+        soubory = [{"jmeno": p.name, "bytes": p.stat().st_size,
+                    "upraveno": p.stat().st_mtime,
+                    "pouziva": 0} for p in sorted(root.glob("*")) if p.is_file()]
+        with ctx.db() as c:
+            for t in c.execute("SELECT dataset, COUNT(*) n FROM tasks GROUP BY dataset").fetchall():
+                for soubor in soubory:
+                    if soubor["jmeno"] == t["dataset"]:
+                        soubor["pouziva"] = t["n"]
+        return {"ok": True, "soubory": soubory, "dovolene": list(_POVOLENE_PRIPONY)}
+
+    @router.post("/api/datasets")
+    def api_dataset_upload(request: Request, body: DatasetBody):
+        """Nahraje CSV/TSV do banky dat; učitel ho pak napíše do pole dataset."""
+        kdo, _ = staff(request)
+        jmeno = _jmeno_souboru(body.jmeno)
+        cesta_k = _cesta_k_datum(jmeno)
+        if cesta_k.exists() and not body.prepsat:
+            raise HTTPException(409, "%s už existuje — zaškrtni přepsat, nebo ho pojmenuj jinak" % jmeno)
+        if len(body.data or "") > _MEZNIK_DAT:
+            raise HTTPException(422, "soubor je moc velký — nejvíc je 4 MB")
+        radky, sloupce = _prepis_csv(body.data, cesta_k)
+        provozni_log("data %s nahrána %s (%d řádků)" % (jmeno, kdo, radky))
+        return {"ok": True, "jmeno": jmeno, "radku": radky, "sloupce": sloupce}
+
+    @router.delete("/api/datasets/{jmeno}")
+    def api_dataset_delete(request: Request, jmeno: str):
+        """Smaže soubor jen tehdy, když na něj žádná úloha neodkazuje."""
+        kdo, _ = staff(request)
+        jmeno = _jmeno_souboru(jmeno)
+        cesta_k = _cesta_k_datum(jmeno)
+        if not cesta_k.is_file():
+            raise HTTPException(404, "takový soubor není")
+        with ctx.db() as c:
+            kde = [r["id"] for r in c.execute(
+                "SELECT id FROM tasks WHERE dataset = ? LIMIT 5", (jmeno,)).fetchall()]
+        if kde:
+            raise HTTPException(409, "na %s se ještě odkazuje %s — nejdřív je přeřaď"
+                                     % (jmeno, ", ".join(kde)))
+        cesta_k.unlink()
+        provozni_log("data %s smazána %s" % (jmeno, kdo))
+        return {"ok": True}
+
+    # --------------------------------------------------- přenos úloh dovnitř/ven
+    async def _prenes_polozky(kdo, polozky, zdroj, odkud):
+        """Přezkouší a uloží přenesené úlohy; co projde, je schváleno hned."""
+        if not isinstance(polozky, list) or not polozky:
+            raise HTTPException(422, "v souboru není seznam úloh — očekává se pole nebo "
+                                     "{\"ukoly\": […]}")
+        vysledky, schvaleno = [], 0
+        for poradi, polozka in enumerate(polozky[:200]):
+            if not isinstance(polozka, dict):
+                continue
+            uloha = _normalizuj_ulohu(polozka, poradi, zdroj, kdo)
+            if not uloha:
+                continue
+            # kdyby JSON obsahoval i rovnou data, založí je do banky dat,
+            # aby je ověření i žák našli pod stejným jménem jako v úloze
+            _uloz_data(uloha.get("dataset"), polozka)
+            if len(vysledky) < 8:                   # ať to u velké banky netrvá věčnost
+                nacteno = await ctx.overeni_spustenim(uloha)
+            else:
+                nacteno = {"ok": False, "duvody": ["neověřeno — moc úloh najednou"]}
+            uloha["status"] = "approved" if nacteno.get("ok") else "draft"
+            uloha["note"] = ("přeneseno: %s, strojem ověřeno" % odkud if nacteno.get("ok")
+                             else "přeneseno: %s — ke kontrole: %s"
+                                  % (odkud, "; ".join(nacteno.get("duvody") or ["neověřeno"])))[:400]
+            with ctx.db() as c:
+                store.upsert_task(c, {**uloha, "check": uloha["check"]})
+            if uloha["status"] == "approved":
+                schvaleno += 1
+            vysledky.append({"id": uloha["id"], "title": uloha["title"],
+                             "status": uloha["status"]})
+        provozni_log("%s %s: %s úloh (%s schváleno)" % (odkud, kdo, len(vysledky), schvaleno))
+        return {"ok": True, "zdroj": zdroj, "pocet": len(vysledky),
+                "schvaleno": schvaleno, "seznam": vysledky}
+
+    @router.post("/api/tasks/import")
+    async def api_tasks_import(request: Request, body: ImportBody):
+        """Nahraje banku úloh ze souboru, který člověk vybere v prohlížeči."""
+        kdo, _ = staff(request)
+        text = (body.data or "").strip()
+        if not text:
+            raise HTTPException(422, "soubor je prázdný")
+        if len(text) > 900_000:
+            raise HTTPException(422, "soubor je moc velký — nejvíc je 900 kB")
+        try:
+            data = json.loads(text)
+        except ValueError as exc:
+            raise HTTPException(422, "v %s není platný JSON: %s" % (body.jmeno, exc))
+        polozky = data if isinstance(data, list) else (data.get("ukoly") or data.get("tasks") or [])
+        return await _prenes_polozky(kdo, polozky, "soubor:%s" % body.jmeno, "ze souboru")
+
+    @router.get("/api/tasks/export")
+    def api_tasks_export(request: Request, status: str = "", lesson: int = -1,
+                         q: str = "", zdroj: str = "", ids: str = "", daty: bool = False):
+        """Banka ven do stejného formátu, jakým se umí vrátit zpátky.
+
+        Filtrovat lze statusem, lekcí, výskytem řetězce, zdrojem nebo výčtem id —
+        aby šlo exportovat všechno, jen co zrovna vidím, nebo vybrané úlohy.
+        """
+        staff(request)
+        vybrane = {x.strip() for x in ids.split(",") if x.strip()}
+        with ctx.db() as c:
+            rows = ctx.tasks_all(c) if hasattr(ctx, "tasks_all") else [
+                store.row_to_task(r) for r in
+                c.execute("SELECT * FROM tasks ORDER BY lesson, id").fetchall()]
+        vybrano = []
+        for t in rows:
+            if status and t.get("status") != status:
+                continue
+            if lesson >= 0 and int(t.get("lesson") or 0) != lesson:
+                continue
+            if zdroj and not (t.get("source") or "").startswith(zdroj):
+                continue
+            if q:
+                hledane = ("%s %s" % (t.get("title", ""), t.get("zadani", ""))).lower()
+                if q.lower() not in hledane:
+                    continue
+            if vybrane and t["id"] not in vybrane:
+                continue
+            vybrano.append({
+                "id": t["id"], "title": t.get("title", ""), "lesson": t.get("lesson", 0),
+                "minutes": t.get("minutes", 4), "level": t.get("level", 1),
+                "skills": t.get("skills") or [], "dataset": t.get("dataset"),
+                "nacti": t.get("nacti") or "", "starter": t.get("starter") or "",
+                "zadani": t.get("zadani", ""), "reseni": t.get("reseni") or "",
+                "check": t.get("check") or t.get("check_r") or "",
+                "hints": t.get("hints") or [], "status": t.get("status", "approved"),
+            })
+            if daty and vybrano[-1]["dataset"]:
+                soubor = Path(_ADRESAR_DAT) / str(vybrano[-1]["dataset"])
+                if soubor.is_file() and soubor.stat().st_size <= 400_000:
+                    try:
+                        radky = list(csv.DictReader(io.StringIO(
+                            soubor.read_text(encoding="utf-8", errors="replace"))))
+                        vybrano[-1]["data"] = radky[:1000]
+                    except OSError:
+                        pass
+        return {"ok": True, "pocet": len(vybrano), "ukoly": vybrano}
+
     # --------------------------------------------- úloha pod drobnohledem (vyučující)
+    @router.get("/api/tasks/{task_id}")
+    def api_task_detail(request: Request, task_id: str):
+        """Jedna úloha i s řešením a kontrolou — aby šla otevřít v editoru."""
+        staff(request)
+        with ctx.db() as c:
+            ukol = ctx.get_task(c, task_id)
+        if not ukol:
+            raise HTTPException(404, "úloha není")
+        return ukol
+
     @router.get("/api/tasks/{task_id}/review")
     async def api_task_review(request: Request, task_id: str):
         """Strukturovaný pohled i s řešením — pro lidskou kontrolu generované úlohy."""
@@ -493,6 +844,36 @@ def register(app: APIRouter, ctx) -> None:
         return {"uloha": ukol,
                 "nahled_dat": {k: nahled.get(k) for k in ("stdout", "error", "env") if k in nahled},
                 "historie": history_overeni(ctx.db, task_id)}
+
+    @router.post("/api/tasks/{task_id}/autofix")
+    async def api_task_autofix(request: Request, task_id: str):
+        """Nech model úlohu přepsat, až projde strojovým ověřením."""
+        kdo, _ = staff(request)
+        with ctx.db() as c:
+            r = c.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+            t = store.row_to_task(r) if r else None
+        if not t:
+            raise HTTPException(404, "úloha neexistuje")
+        nacteno = await ctx.overeni_spustenim(t)
+        if nacteno["ok"]:
+            return {"ok": True, "status": t.get("status"), "opraveno": False,
+                    "zprava": "úloha už ověřením prochází", "detail": nacteno}
+        navrhy = await ai.fix_task(t, nacteno)
+        if navrhy.get("chyba"):
+            return {"ok": False, "opraveno": False, "zprava": navrhy["chyba"], "detail": nacteno}
+        opravena = {**t}
+        for údaj in ("reseni", "check", "zadani", "starter", "nacti"):
+            if navrhy.get(údaj):
+                opravena[údaj] = navrhy[údaj]
+        overeno = await ctx.overeni_spustenim(opravena)
+        opravena["status"] = "approved" if overeno["ok"] else "draft"
+        opravena["note"] = (("opraveno modelem: " if overeno["ok"] else "model ještě neprošlo: ")
+                            + (navrhy.get("duvod") or ""))[:400]
+        with ctx.db() as c:
+            store.upsert_task(c, {**opravena, "check": opravena["check"]})
+        provozni_log("úloha %s opravována modelem (podnět %s) → %s" % (task_id, kdo, opravena["status"]))
+        return {"ok": overeno["ok"], "opraveno": True, "status": opravena["status"],
+                "zprava": navrhy.get("duvod") or "", "detail": overeno, "uloha": opravena}
 
     @router.post("/api/tasks/{task_id}/verify")
     async def api_task_verify(request: Request, task_id: str, body: OveritBody):
@@ -579,6 +960,27 @@ def register(app: APIRouter, ctx) -> None:
         return {"ok": True, "poskytovatel": nasazeni["poskytovatel"], "model": nasazeni["model"],
                 "klic": instance.mask(nasazeni.get("klic", "")), "online": online,
                 "hlaska": hlaska[:300], "mimo_zdani": nasazeni["venku"]}
+
+    # ------------------------------------------------------ banka úloh z GitHubu
+    @router.post("/api/github/import")
+    async def api_github_import(request: Request, body: GithubBody):
+        """Načte soubor s úlohami z repozitáře učitele a založí je jako koncepty.
+
+        Přebírá se `ukoly.json` (nebo to, na co ukáže odkaz); položky smí být
+        česky i anglicky popsané. Každá se přezkouší spuštěním — co projde, je
+        hned schváleno, zbytek zůstává přečtení člověkem.
+        """
+        kdo, _ = staff(request)
+        uvnitř = _rozloz_github(body.odkaz)
+        if not uvnitř:
+            raise HTTPException(422, "tomu odkazu rozumím jako https://github.com/vlastnik/repo "
+                                     "nebo vlastnik/repo/soubor.json")
+        vlastnik, rep, ref, cesta = uvnitř
+        prima = body.odkaz.strip() if "githubusercontent.com/" in body.odkaz.lower() else ""
+        data = await _stahni_github(vlastnik, rep, ref or body.ref or "main", cesta, prima)
+        polozky = data if isinstance(data, list) else (data.get("ukoly") or data.get("tasks") or [])
+        return await _prenes_polozky(kdo, polozky, f"github:{vlastnik}/{rep}",
+                                     "z GitHubu %s" % (cesta or "výchozí soubor"))
 
     # --------------------------------------------------- přihlašování přes bránu (admin)
     @router.get("/api/admin/login")

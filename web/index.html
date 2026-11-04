@@ -130,6 +130,7 @@
         </select>
         <input id="f-q" placeholder="hledat v názvu/zadání…" style="width:260px">
         <button id="btn-gen" class="ghost" title="nechat AI napsat a automaticky ověřit dvě nové úlohy">+ vygenerovat úlohy</button>
+        <button id="btn-nova" class="ghost" title="napsat si úlohu sám">+ vlastní úlohu</button>
         <span id="genstatus" class="tiny muted"></span>
       </div>
       <div class="card" style="padding:0;overflow:auto">
@@ -166,10 +167,10 @@
             <input id="tc-name" placeholder="např. Skupina A — úterý"></div>
           <div><label for="tc-note">poznámka (nepovinná)</label><input id="tc-note"></div>
         </div>
-        <label for="tc-zaci">žáci ve třídě</label>
-        <select id="tc-zaci" multiple size="6"></select>
-        <p class="tiny muted">Drž Ctrl (Cmd) a vyber víc účtů. Učitel může mít tříd víc a
-         téhož žáka klidně ve dvou.</p>
+        <label id="tc-zaci-lbl">žáci ve třídě — klikni, kdo do ní patří</label>
+        <div id="tc-zaci" class="zaci-list" role="group" aria-labelledby="tc-zaci-lbl"></div>
+        <p class="tiny muted">Učitel může mít tříd víc a stejného žáka zařadit do dvou.
+          Třídu smažeš tlačítkem u ní.</p>
         <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
           <button id="tc-new" class="ghost" type="button">začít novou třídu</button>
           <button id="tc-save" class="primary" type="button">uložit třídu</button>
@@ -182,36 +183,15 @@
         <p class="tiny muted">Údaje jsou z tvého serveru; studenti je vidí taky, navzájem ne.</p></div>
       <div class="card" style="margin-top:14px" id="studentdetail"></div>
       <div class="card" style="margin-top:14px">
-        <h3 id="taskeditor-title">Nová úloha</h3>
-        <p class="tiny muted">Kontrola je R kód, který musí vrátit TRUE nebo
-          <code>list(pass=, msg=)</code>. Očekávanou hodnotu počítej ze dat (<code>read.csv</code>),
-          nepiš čísla napevno. Uložení samo spustí řešení i prázdný kód — úloha se ukáže až když
-          projde.</p>
-        <div class="grid g2">
-          <div><label for="nt-id">id</label><input id="nt-id" placeholder="nechat vygenerovat"></div>
-          <div><label for="nt-title">titulek</label><input id="nt-title"></div>
-          <div><label for="nt-lesson">lekce (0–11)</label><input id="nt-lesson" value="4"></div>
-          <div><label for="nt-min">minuty</label><input id="nt-min" value="4"></div>
-          <div><label for="nt-level">obtížnost 0–5</label><input id="nt-level" value="2"></div>
-          <div><label for="nt-skills">dovednosti (odděl čárkou)</label><input id="nt-skills"></div>
-          <div><label for="nt-dataset">dataset (soubor, nebo prázdné)</label><input id="nt-dataset"></div>
-          <div><label for="nt-nacti">načtení dat v R</label><input id="nt-nacti"></div>
+        <h3>Vlastní úlohy</h3>
+        <p class="tiny muted">Úlohu napsat nebo upravit jde z dialogu — až jsi kdekoli.
+          Uložit se dá jen taková, která projde vlastním řešením.</p>
+        <div class="row" style="gap:6px;flex-wrap:wrap">
+          <button class="js-nova-uloha primary" type="button">Vytvořit vlastní úlohu</button>
         </div>
-        <label for="nt-zadani">zadání</label><textarea id="nt-zadani" rows="3"></textarea>
-        <label for="nt-starter">startovací kostra</label><textarea id="nt-starter" rows="3"></textarea>
-        <label for="nt-reseni">řešení (musí projít kontrolou)</label><textarea id="nt-reseni" rows="5"></textarea>
-        <label for="nt-check">kontrola (R)</label><textarea id="nt-check" rows="5"></textarea>
-        <label for="nt-hints">napovědy (jedna na řádek)</label><textarea id="nt-hints" rows="3"></textarea>
-        <label class="checkrow"><input type="checkbox" id="nt-ai" checked>
-          nechat úlohu před uložením zkontrolovat i modelem (trvá déle)</label>
-        <p class="tiny muted" id="nt-edit">Upravuješ hotovou úlohu — dokud projde řešením a neprojde
-          prázdným kódem, uložení se odmítne a původní text zůstane.</p>
-        <div class="row end" style="margin-top:10px">
-          <button id="nt-clear" class="ghost" type="button">vyčistit</button>
-          <button id="nt-force" class="ghost" type="button">uložit i přesto (koncept)</button>
-          <button id="nt-save" class="primary" type="button">Uložit a ověřit</button>
-        </div>
-        <p class="tiny" id="nt-status" role="status"></p>
+        <div class="sep"></div>
+        <h3>Banka úloh</h3>
+        <div class="banka" id="trida-banka"></div>
       </div>
     </section>
 
@@ -250,6 +230,54 @@
     <section class="view" id="v-sheet">
       <div class="card sheet" id="sheet"><p class="muted">Tahák se načítá…</p></div>
     </section>
+      <div class="modal" id="taskmodal" hidden>
+        <div class="card" role="dialog" aria-modal="true"
+             aria-labelledby="taskeditor-title"
+             style="max-width:920px;width:min(920px,94vw);max-height:90vh;overflow:auto">
+        <div class="row" style="justify-content:space-between;align-items:baseline">
+          <h3 id="taskeditor-title">Nová úloha</h3>
+          <button id="taskmodal-close" class="ghost" type="button">zavřít</button>
+        </div>
+        <p class="tiny muted">Kontrola je R kód, který musí vrátit TRUE nebo
+          <code>list(pass=, msg=)</code>. Očekávanou hodnotu počítej ze dat (<code>read.csv</code>),
+          nepiš čísla napevno. Uložení samo spustí řešení i prázdný kód — úloha se ukáže až když
+          projde.</p>
+        <div class="grid g2">
+          <div><label for="nt-id">id</label><input id="nt-id" placeholder="nechat vygenerovat"></div>
+          <div><label for="nt-title">titulek</label><input id="nt-title"></div>
+          <div><label for="nt-lesson">lekce (0–11)</label><input id="nt-lesson" value="4"></div>
+          <div><label for="nt-min">minuty</label><input id="nt-min" value="4"></div>
+          <div><label for="nt-level">obtížnost 0–5</label><input id="nt-level" value="2"></div>
+          <div><label for="nt-skills">dovednosti (odděl čárkou)</label><input id="nt-skills"></div>
+          <div><label for="nt-dataset">dataset (soubor z banky dat)</label>
+            <input id="nt-dataset" list="datasety" placeholder="např. zkousky.csv"></div>
+          <div><label for="nt-nacti">načtení dat v R</label><input id="nt-nacti"></div>
+        </div>
+        <label for="nt-zadani">zadání</label><textarea id="nt-zadani" rows="3"></textarea>
+        <label for="nt-starter">startovací kostra</label><textarea id="nt-starter" rows="3"></textarea>
+        <label for="nt-reseni">řešení (musí projít kontrolou)</label><textarea id="nt-reseni" rows="5"></textarea>
+        <label for="nt-check">kontrola (R)</label><textarea id="nt-check" rows="5"></textarea>
+        <label for="nt-hints">napovědy (jedna na řádek)</label><textarea id="nt-hints" rows="3"></textarea>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
+          <label for="nt-dat" class="tiny muted" style="margin:0">úloha potřebuje nová data? nahraj je:</label>
+          <input type="file" id="nt-dat" accept=".csv,.tsv,.txt,text/csv" style="flex:1;min-width:200px">
+          <button id="nt-dat-nahrat" class="ghost" type="button">nahrát do banky dat</button>
+          <label class="checkrow" style="margin:0"><input type="checkbox" id="nt-dat-prepsat"> přepsat existující</label>
+        </div>
+        <p class="tiny" id="nt-dat-status" role="status"></p>
+        <datalist id="datasety"></datalist>
+        <label class="checkrow"><input type="checkbox" id="nt-ai" checked>
+          nechat úlohu před uložením zkontrolovat i modelem (trvá déle)</label>
+        <p class="tiny muted" id="nt-edit">Upravuješ hotovou úlohu — dokud projde řešením a neprojde
+          prázdným kódem, uložení se odmítne a původní text zůstane.</p>
+        <div class="row end" style="margin-top:10px">
+          <button id="nt-clear" class="ghost" type="button">vyčistit</button>
+          <button id="nt-force" class="ghost" type="button">uložit i přesto (koncept)</button>
+          <button id="nt-save" class="primary" type="button">Uložit a ověřit</button>
+        </div>
+        <p class="tiny" id="nt-status" role="status"></p>
+        </div>
+      </div>
   </main>
 </div>
 

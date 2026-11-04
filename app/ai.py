@@ -302,6 +302,50 @@ async def review_task(task: dict) -> dict:
             "zavady": zavady}
 
 
+FIX_SYSTEM = (
+    "Jsi opravář úloh pro kurz R. Dostaneš úlohu, která neprošla strojovým "
+    "ověřením, spolu s výstupem z R. Oprav ji tak, aby (a) vlastní řešení "
+    "kontrolou prošlo, (b) prázdný kód kontrolou neprošel a (c) startovací "
+    "kostka také neprošla. Kontrolu piš jako R kód, který vrací TRUE nebo "
+    "list(pass=, msg=); očekávanou hodnotu počítej ze dat, ne ji piš napevno. "
+    "Zadání měň jen tehdy, je-li skutečně nejasné. Vrať JEDEN JSON bez "
+    "komentáře: {\"reseni\": \"...\", \"check\": \"...\", \"zadani\": \"...\", "
+    "\"starter\": \"...\", \"nacti\": \"...\", \"duvod\": \"co a proč jsem změnil\"}"
+)
+
+
+async def fix_task(task: dict, detail: dict | None = None) -> dict:
+    """Nech model úlohu přepsat tak, aby prošla. Výsledek je návrh — soudí člověk."""
+    kus = {k: str(task.get(k) or "")[:2200] for k in ("zadani", "reseni", "check", "starter", "nacti")}
+    kus["dataset"] = task.get("dataset")
+    selhani = {k: (detail or {}).get(k) for k in ("reseni_proslo", "prazdny_kod_prosel",
+                                                  "kostka_prosel", "duvody", "zprava_kontrolky")}
+    zprávy = [{"role": "system", "content": FIX_SYSTEM},
+              {"role": "user", "content": json.dumps(
+                  {"uloha": kus, "selhani": selhani,
+                   "vystup_z_R": str((detail or {}).get("vystup_reseni") or "")[:1500]},
+                  ensure_ascii=False)}]
+    surove = ""
+    for pokus in (zprávy, _zkracene(zprávy)):
+        try:
+            surove = await chat(pokus, temperature=0.2, json_mode=True, ucel="psani")
+        except Exception as exc:  # noqa: BLE001
+            return {"chyba": str(exc)[:200]}
+        data = _parse_json(surove)
+        if data:
+            break
+    if not data:
+        return {"chyba": "model neodpověděl JSONem", "ukázka": str(surove)[:300]}
+    return {
+        "reseni": str(data.get("reseni") or "")[:6000],
+        "check": str(data.get("check") or data.get("kontrola") or "")[:6000],
+        "zadani": str(data.get("zadani") or "")[:6000],
+        "starter": str(data.get("starter") or "")[:3000],
+        "nacti": str(data.get("nacti") or "")[:1500],
+        "duvod": str(data.get("duvod") or "")[:800],
+    }
+
+
 def _zkracene(zprávy: list[dict]) -> list[dict]:
     """Druhý pokus bez detailů — kdyby první odpověď byla moc dlouhá na kontext."""
     zp = [dict(zprávy[0])]

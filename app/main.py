@@ -424,7 +424,9 @@ def api_plan(request: Request, minutes: int | None = None, refresh: int = 0):
 
 def ensure_plan(c: sqlite3.Connection, user: str) -> list[dict]:
     row = c.execute("SELECT task_ids, minutes FROM plan WHERE day = ? AND user = ?", (today(), user)).fetchone()
-    tasks = tasks_all(c)
+    # do dávky patří jen schválené úlohy, které si člověk osobně nezahodil
+    odlozeno = store.dropped_for(c, user)
+    tasks = [t for t in tasks_all(c) if t.get("status") == "approved" and t["id"] not in odlozeno]
     budget = minutes_budget(c, user)
     if row:
         ids = json.loads(row["task_ids"])
@@ -433,8 +435,10 @@ def ensure_plan(c: sqlite3.Connection, user: str) -> list[dict]:
             (user, today()))}
         items = []
         for tid in ids:
+            if tid in odlozeno:
+                continue
             t = get_task(c, tid)
-            if not t:
+            if not t or t.get("status") != "approved":
                 continue
             t["solved"] = tid in done
             t.pop("check_r", None); t.pop("reseni", None)
@@ -483,6 +487,86 @@ def api_pick(request: Request, body: PickBody):
                       (today(), user, json.dumps(ids), minutes_budget(c, user), time.time()))
         t.pop("check_r", None); t.pop("reseni", None)
         return t
+
+
+class DropBody(BaseModel):
+    task_id: str
+    obnovit: bool = False
+
+
+@app.post("/api/drop")
+def api_drop(request: Request, body: DropBody):
+    """Žák si úlohu osobně zahodí — nebo zas obnoví. Banky se to nedotkne."""
+    user = current_user(request) or USER
+    with db() as c:
+        if not c.execute("SELECT 1 FROM tasks WHERE id = ?", (body.task_id,)).fetchone():
+            raise HTTPException(404, "neznámá úloha")
+        store.set_dropped(c, user, body.task_id, not body.obnovit)
+        # ze dnešní dávky zmizí hned, jinak by ji člověk viděl dál
+        radka = c.execute("SELECT task_ids FROM plan WHERE day=? AND user=?", (today(), user)).fetchone()
+        if radka and not body.obnovit:
+            ids = [i for i in json.loads(radka["task_ids"]) if i != body.task_id]
+            c.execute("UPDATE plan SET task_ids=? WHERE day=? AND user=?",
+                      (json.dumps(ids), today(), user))
+    return {"ok": True, "zahozeno": not body.obnovit}
+
+
+class OwnBody(BaseModel):
+    """To, co žák u své úlohy smí měnit. Hodnoty dál neprojdou bez ověření."""
+    id: str | None = None
+    title: str = ""
+    zadani: str
+    reseni: str = ""
+    check: str = ""
+    starter: str = ""
+    nacti: str = ""
+    dataset: str | None = None
+    hints: list[str] = []
+    minutes: int = 4
+    lesson: int = 0
+    level: float = 2.0
+    skills: list[str] = []
+
+
+@app.post("/api/own")
+async def api_own(request: Request, body: OwnBody):
+    """Žák sepíše nebo upraví vlastní úlohu. Než se ukáže světu, musí projít spuštěním."""
+    user = current_user(request) or USER
+    if not body.zadani.strip():
+        raise HTTPException(422, "bez zadání z toho úloha nevznikne")
+    if not body.reseni.strip():
+        raise HTTPException(422, "přilož i řešení — bez něj to nemůžeme ověřit")
+    with db() as c:
+        exist = get_task(c, body.id) if body.id else None
+    # žáh nezasáhne do cizích věcí — měnit smí jen to, co samo vytvořilo
+    if body.id and not exist:
+        raise HTTPException(403, "takovou úlohu nemůžeš přepisovat")
+    if exist and (exist.get("owner") or "") != user:
+        raise HTTPException(403, "tohle není tvoje úloha — upravit ji může jen ten, kdo ji napsal")
+    if body.dataset and body.dataset not in datasets():
+        raise HTTPException(422, "soubor %s v bance dat není — nejdřív ho nahraj" % body.dataset)
+    klice = re.sub(r"[^a-z0-9]+", "-", user.lower()).strip("-")[:10]
+    uloha = {
+        "id": body.id or ("zak-%s-%x" % (klice or "zak", int(time.time()) & 0xffff)),
+        "title": (body.title or body.zadani)[:60].strip(),
+        "lesson": int(body.lesson or 0), "minutes": max(1, min(int(body.minutes or 4), 30)),
+        "level": max(1.0, min(float(body.level or 2.0), 4.5)),
+        "skills": [str(s)[:24] for s in (body.skills or [])][:6],
+        "dataset": body.dataset, "nacti": body.nacti or "", "starter": body.starter or "",
+        "zadani": body.zadani, "check": body.check or "FALSE", "reseni": body.reseni,
+        "hints": [str(h)[:400] for h in (body.hints or [])][:5],
+        "status": "draft", "source": "vlastni", "owner": user, "note": "",
+    }
+    if not uloha["dataset"]:
+        uloha["nacti"] = ""
+    prezkous = await validate_task(uloha)
+    uloha["status"] = "approved" if prezkous["ok"] else "draft"
+    uloha["note"] = ("vlastní úloha — ověřeno spuštěním" if prezkous["ok"]
+                     else "vlastní úloha ke kontrole: " + str(prezkous.get("msg", ""))[:300])
+    with db() as c:
+        store.upsert_task(c, uloha)
+    return {"ok": prezkous["ok"], "ulozeno": True, "id": uloha["id"], "status": uloha["status"],
+            "zprava": uloha["note"]}
 
 
 # Knihovny se počítají na minutu: zavření dplyr+ggplot2+… stojí ~2,5 s navíc
@@ -687,8 +771,10 @@ async def api_solution(request: Request, body: SolutionBody):
 @app.get("/api/tasks")
 def api_tasks(request: Request, lesson: int | None = None, skill: str | None = None,
               status: str | None = None):
-    # koncepty vidí jen učitel a správce — student ať nedostane nic neprověřeného
-    role = ensure_users().get(current_user(request) or "", {}).get("role", "student")
+    # koncepty vidí jen učitel a správce — student ať nedostane nic neprověřeného,
+    # výjimkou je koncept, který on sám nechal napsat nebo napsal
+    kdo = current_user(request) or ""
+    role = ensure_users().get(kdo, {}).get("role", "student")
     vidim_koncepty = role in ("teacher", "admin")
     with db() as c:
         q = "SELECT * FROM tasks WHERE status != 'retired'"
@@ -703,11 +789,15 @@ def api_tasks(request: Request, lesson: int | None = None, skill: str | None = N
             q += " AND status = ?"
             args.append(status)
         if not vidim_koncepty:
-            q += " AND status = 'approved'"
+            q += " AND (status = 'approved' OR owner = ?)"
+            args.append(kdo)
         q += " ORDER BY lesson, level, id"
+        odlozeno = store.dropped_for(c, kdo or USER)
         out = []
         for r in c.execute(q, args):
             t = store.row_to_task(r)
+            t["moje"] = bool(t.get("owner")) and t.get("owner") == kdo
+            t["zahozena"] = t["id"] in odlozeno
             a = c.execute("SELECT COUNT(*) n, COALESCE(SUM(ok),0) p FROM attempts WHERE user=? AND task=?",
                           (current_user(request) or USER, t["id"])).fetchone()
             t.update(attempts=a["n"], passed=a["p"])
@@ -827,6 +917,8 @@ async def api_generate(request: Request, count: int = 2):
         verdict = await validate_task(draft)
         draft["status"] = "approved" if verdict["ok"] else "draft"
         draft["note"] = verdict.get("msg", "")[:400]
+        # ať víme, komu koncept patří, když ho chce ještě upravit
+        draft["owner"] = "" if user == "system" else user
         with db() as c:
             store.upsert_task(c, draft)
         made.append({"id": draft["id"], "title": draft["title"], "validated": verdict["ok"],

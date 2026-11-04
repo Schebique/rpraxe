@@ -314,11 +314,43 @@ async function loadLib() {
         <td><strong>${esc(t.title)}</strong><div class="tiny muted">${esc((t.skills || []).join(", "))} · ${esc(t.id)}</div></td>
         <td>${t.lesson}</td><td>${Number(t.level).toFixed(1)}</td>
         <td>${t.passed}/${t.attempts}</td>
-        <td>${t.status === "draft" ? '<span class="pill">koncept</span>' : ""}
+        <td>${t.status === "draft" ? `<span class="pill">${t.moje ? "tvůj koncept" : "koncept"}</span>` : ""}
+            ${t.zahozena ? '<span class="pill">zahozeno</span>' : ""}
             <button data-id="${esc(t.id)}" class="ghost pick">do dneška</button>
-            <button data-id="${esc(t.id)}" class="ghost look" title="úkoly, řešení a kontrola zvlášť">prozkoumat</button></td></tr>`).join("");
+            <button data-id="${esc(t.id)}" class="ghost look" title="úkoly, řešení a kontrola zvlášť">prozkoumat</button>
+            ${["teacher", "admin"].includes(ROLE)
+              ? `<button data-id="${esc(t.id)}" class="ghost upravit" title="upravit v editoru">upravit</button>
+                <button data-id="${esc(t.id)}" class="ghost schvalit" title="ukázat studentům">schválit</button>
+                <button data-id="${esc(t.id)}" class="ghost zahodit" title="schovat před studenty">zahodit</button>`
+              : `${t.moje && t.status === "draft"
+                  ? `<button data-id="${esc(t.id)}" class="ghost my-edit" title="dopsat a nechat ověřit">upravit</button>` : ""}
+                 <button data-id="${esc(t.id)}" class="ghost my-drop" data-zahozeno="${t.zahozena ? 1 : 0}">${t.zahozena ? "obnovit" : "zahodit"}</button>`}</td></tr>`).join("");
     if (!["teacher", "admin"].includes(ROLE)) $$("#tasks .look").forEach(b => b.remove());
+    $$("#tasks .my-edit").forEach(b => b.onclick = async () => {
+      const u = await api(`/api/tasks/${b.dataset.id}`);
+      if (!u || !u.id) { toast("úlohu jsem nenašel"); return; }
+      u.check = u.check ?? u.check_r; nactiDatasety(); otorEditor(u);
+    });
+    $$("#tasks .my-drop").forEach(b => b.onclick = () => {
+      const zahozene = b.dataset.zahozeno === "1";
+      const deal = async () => {
+        await api("/api/drop", { method: "POST",
+          body: JSON.stringify({ task_id: b.dataset.id, obnovit: zahozene }) });
+        toast(zahozene ? "úloha je zpátky" : "zahazeno — nikdo ti ji už nenabídne");
+        loadLib();
+      };
+      zahozene ? deal() : potvrd(`Opravdu zahodit ${b.dataset.id}? Jen u sebe; banka zůstane celá.`,
+                                deal, "zahodit");
+    });
     $$("#tasks .look").forEach(b => b.onclick = () => openReview(b.dataset.id));
+    $$("#tasks .schvalit").forEach(b => b.onclick = () => zmenStav(b.dataset.id, "approved"));
+    $$("#tasks .zahodit").forEach(b => b.onclick = () => potvrd(
+      `Opravdu zahodit ${b.dataset.id}? Studenti ji neuvidí; smazat se dá úplně později.`,
+      () => zmenStav(b.dataset.id, "retired"), "zahodit"));
+    $$("#tasks .upravit").forEach(b => b.onclick = async () => {
+      const u = await api(`/api/tasks/${b.dataset.id}`);
+      if (u && u.id) upravUlohu(u); else toast("úlohu jsem nenašel");
+    });
     $$("#tasks .pick").forEach(b => b.onclick = async () => {
       await api("/api/pick", { method: "POST", body: JSON.stringify({ task_id: b.dataset.id }) });
       toast("Přidáno do dnešní dávky."); await loadBoot(); show("today");
@@ -586,6 +618,7 @@ async function openReview(id) {
         <button class="ghost" id="rev-close" type="button">${esc(t("zavřít"))}</button>
         <button class="ghost" id="rev-edit" type="button">${esc(t("upravit v editoru"))}</button>
         <button class="ghost" id="rev-ai" type="button">${esc(t("nechat zkontrolovat modelem"))}</button>
+        <button class="ghost" id="rev-fix" type="button">${esc(t("nechat opravit modelem"))}</button>
         <button class="primary" id="rev-run" type="button">${esc(t("ověřit spuštěním"))}</button>
       </div>
     </div>`;
@@ -593,11 +626,38 @@ async function openReview(id) {
   translateDom(modal);
   modal.onclick = e => { if (e.target === modal) modal.remove(); };
   modal.querySelector("#rev-close").onclick = () => modal.remove();
-  modal.querySelector("#rev-edit").onclick = () => { modal.remove(); upravUlohu(u); };
 
   const d = await api(`/api/tasks/${id}/review`);
   if (!modal.isConnected) return;            // mezitím se zavřelo nebo otevřelo jiné
   const u = d.uloha || {};
+  modal.querySelector("#rev-edit").onclick = () => { modal.remove(); upravUlohu({ ...u, id }); };
+  modal.querySelector("#rev-fix").onclick = async () => {
+    const vysledek = modal.querySelector("#rev-vysledek");
+    if (!vysledek) return;
+    vysledek.innerHTML = `<p class="tiny muted">${esc(t("model přepisuje úlohu, ať projde…"))}</p>`;
+    let r;
+    try { r = await api(`/api/tasks/${id}/autofix`, { method: "POST", body: "{}" }); }
+    catch (e) { vysledek.innerHTML = `<p class="err">${esc(t("model není dostupný"))}</p>`; return; }
+    if (!modal.isConnected) return;
+    const detail = r.detail || {};
+    vysledek.innerHTML = `<p class="${r.ok ? "ok" : "err"}">${
+        r.ok ? "✓ " + esc(t("přepsáno a ověřeno — teď to projde"))
+             : "✗ " + esc(t("po přepsání to pořád neprochází"))}</p>
+      ${r.zprava ? `<p class="tiny">${esc(String(r.zprava))}</p>` : ""}
+      <ul class="tiny muted">
+        <li>${esc(t("řešení prošlo"))}: ${detail.reseni_proslo ? "✓" : "✗"} ·
+          ${esc(t("prázdný kód"))}: ${detail.prazdny_kod_prosel ? "✗ " + esc(t("propustil kontrolu")) : "✓"} ·
+          ${esc(t("startovací kostka"))}: ${detail.kostka_prosel ? "✗ " + esc(t("propustila kontrolu")) : "✓"}</li>
+      </ul>
+      ${r.opraveno ? `<h4 class="tiny" style="margin-top:10px">${esc(t("co model změnil"))}</h4>
+        <p class="tiny">${esc(String((r.opraveno || {}).duvod || ""))}</p>
+        <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+          <button class="ghost" id="rev-reedit" type="button">${esc(t("upravit v editoru"))}</button>
+        </div>` : ""}`;
+    translateDom(vysledek);
+    const znovu = vysledek.querySelector("#rev-reedit");
+    if (znovu && r.uloha) znovu.onclick = () => { modal.remove(); upravUlohu(r.uloha); };
+  };
   const stav = { draft: t("koncept"), approved: t("schváleno"), retired: t("schováno") }[u.status] || u.status;
   modal.querySelector("#rev-obsah").innerHTML = `
     <div class="row" style="gap:10px;flex-wrap:wrap">
@@ -939,37 +999,53 @@ async function loadTridy() {
   try { d = await api("/api/classes"); } catch (e) { box.innerHTML = `<p class="err">${esc(t("není spojení"))}</p>`; return; }
   TRIDY = d.tridy || [];
   const zaci = d.zaci || [];
-  const vyber = $("#tc-zaci");
-  if (vyber) {
-    const vybrani = new Set((TRIDY.find(k => k.id === TRIDA_VYBRANA) || {}).students || []);
-    vyber.innerHTML = zaci.map(z => `<option value="${esc(z)}" ${vybrani.has(z) ? "selected" : ""}>${esc(z)}</option>`).join("")
-      || `<option value="">${esc(t("zatím žádný studentský účet"))}</option>`;
+  const seznam = $("#tc-zaci");
+  if (seznam) {
+    //výběr žáků: klikací štítky — multiple select lidem nedojde
+    const veTride = new Set((TRIDY.find(k => k.id === TRIDA_VYBRANA) || {}).students || []);
+    seznam.innerHTML = zaci.length ? zaci.map(z => `
+      <label class="zak"><input type="checkbox" value="${esc(z)}" ${veTride.has(z) ? "checked" : ""}>
+        <span>${esc(z)}</span></label>`).join("")
+      : `<p class="tiny muted">${esc(t("zatím žádný studentský účet"))}</p>`;
   }
   box.innerHTML = TRIDY.length ? `<div class="tridy">${TRIDY.map(k => `
-      <button type="button" class="trida ${k.id === TRIDA_VYBRANA ? "on" : ""}" data-id="${esc(k.id)}">
-        <strong>${esc(k.name)}</strong>${k.cizí ? ` <span class="pill">${esc(t("cizí"))}</span>` : ""}
-        <div class="tiny muted">${esc(t("učitel"))}: ${esc(k.teacher)} · ${k.students.length} ${esc(t("žáků"))}${
-          k.note ? ` · ${esc(k.note)}` : ""}</div>
+      <div class="trida ${k.id === TRIDA_VYBRANA ? "on" : ""}" data-id="${esc(k.id)}" tabindex="0"
+           role="button" aria-pressed="${k.id === TRIDA_VYBRANA}">
+        <div class="row" style="justify-content:space-between;gap:6px">
+          <strong>${esc(k.name)}</strong>${k.cizí ? ` <span class="pill">${esc(t("cizí"))}</span>` : ""}
+        </div>
+        <div class="tiny muted">${esc(t("učitel"))}: ${esc(k.teacher)} · ${k.students.length} ${esc(t("žáků"))}</div>
+        ${k.note ? `<div class="tiny muted">${esc(k.note)}</div>` : ""}
         <div class="tiny">${k.students.length ? esc(k.students.join(", ")) : esc(t("zatím bez žáků"))}</div>
-      </button>`).join("")}</div>`
+        ${k.cizí ? "" : `<button type="button" class="ghost js-smaz-tridu" data-id="${esc(k.id)}"
+          style="margin-top:6px">${esc(t("smazat třídu"))}</button>`}
+      </div>`).join("")}</div>`
     : `<p class="tiny muted">${esc(t("Zatím žádná třída — založ první níže."))}</p>`;
   translateDom(box);
-  $$("#tridy .trida").forEach(klick => klick.onclick = () => {
-    TRIDA_VYBRANA = klick.dataset.id;
-    const k = TRIDY.find(x => x.id === TRIDA_VYBRANA) || {};
-    $("#tc-name").value = k.name || "";
-    $("#tc-note").value = k.note || "";
-    const vybrani = new Set(k.students || []);
-    $$("#tc-zaci option").forEach(o => { o.selected = vybrani.has(o.value); });
-    loadTridy();
+  $$("#tridy .trida").forEach(karta => {
+    const vyber = () => { TRIDA_VYBRANA = karta.dataset.id; vyplnTridu(); loadTridy(); };
+    karta.onclick = (e) => { if (!e.target.closest(".js-smaz-tridu")) vyber(); };
+    karta.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); vyber(); } };
   });
+  $$("#tridy .js-smaz-tridu").forEach(tlacitko =>
+    tlacitko.onclick = (e) => { e.stopPropagation(); smazTridu(tlacitko.dataset.id); });
+}
+
+/** Dosadí vybranou třídu do formuláře včetně zaškrtnutých žáků. */
+function vyplnTridu() {
+  const k = TRIDY.find(x => x.id === TRIDA_VYBRANA) || {};
+  const jmeno = $("#tc-name"), poznamka = $("#tc-note");
+  if (jmeno) jmeno.value = k.name || "";
+  if (poznamka) poznamka.value = k.note || "";
+  const veTride = new Set(k.students || []);
+  $$("#tc-zaci input").forEach(pole => { pole.checked = veTride.has(pole.value); });
 }
 
 function novaTrida() {
   TRIDA_VYBRANA = null;
   $("#tc-name").value = "";
   $("#tc-note").value = "";
-  $$("#tc-zaci option").forEach(o => { o.selected = false; });
+  $$("#tc-zaci input").forEach(pole => { pole.checked = false; });
   $("#tc-status").textContent = "";
   loadTridy();
   $("#tc-name").focus();
@@ -977,25 +1053,43 @@ function novaTrida() {
 
 async function ulozTridu() {
   const stav = $("#tc-status");
-  const zaci = $$("#tc-zaci").flatMap(sel => [...sel.selectedOptions].map(o => o.value));
+  const jmeno = $("#tc-name").value.trim();
+  if (!jmeno) { stav.className = "tiny err"; stav.textContent = t("Napiš aspoň název třídy."); return; }
+  const zaci = $$("#tc-zaci input").filter(pole => pole.checked).map(pole => pole.value);
   const r = await api("/api/classes", { method: "POST", body: JSON.stringify({
-    id: TRIDA_VYBRANA, name: $("#tc-name").value.trim(),
+    id: TRIDA_VYBRANA, name: jmeno,
     poznamka: $("#tc-note").value.trim(), zaci }) });
   if (r && r.ok) {
     TRIDA_VYBRANA = r.trida.id;
     stav.className = "tiny ok";
-    stav.textContent = `${t("Třída uložena")}: ${r.trida.name}`;
+    stav.textContent = `${t("Třída uložena")}: ${r.trida.name} (${r.trida.students.length} ${t("žáků")})`;
     await loadTridy(); loadClass();
   } else { stav.className = "tiny err"; stav.textContent = (r && r.detail) || t("nepovedlo se"); }
 }
 
-async function smazTridu() {
-  if (!TRIDA_VYBRANA) { $("#tc-status").textContent = t("Vyber třídu, kterou chceš smazat."); return; }
-  const jmeno = (TRIDY.find(k => k.id === TRIDA_VYBRANA) || {}).name || TRIDA_VYBRANA;
-  if (!await ptat(`${t("Smazat třídu")} ${jmeno}? ${t("Žáci zůstanou, zmizí jen sdružení.")}`, "SMAZAT")) return;
-  const r = await api(`/api/classes/${TRIDA_VYBRANA}`, { method: "DELETE" });
-  if (r && r.ok) { toast(t("Třída smazána")); novaTrida(); loadClass(); }
-  else $("#tc-status").textContent = (r && r.detail) || t("nepovedlo se");
+/** Smaže třídu. Žáci zůstanou, zmizí jen jejich sdružení. */
+function smazTridu(id) {
+  const cislo = id || TRIDA_VYBRANA;
+  if (!cislo) {
+    const stav = $("#tc-status");
+    stav.className = "tiny err";
+    stav.textContent = t("Nejdřív klikni na třídu, kterou chceš smazat.");
+    return;
+  }
+  const jmeno = (TRIDY.find(k => k.id === cislo) || {}).name || cislo;
+  potvrd(`${t("Opravdu smazat třídu")} ${jmeno}? ${t("Žáci zůstanou, zmizí jen sdružení.")}`,
+    async () => {
+      const r = await api(`/api/classes/${encodeURIComponent(cislo)}`, { method: "DELETE" });
+      if (r && r.ok) {
+        if (TRIDA_VYBRANA === cislo) TRIDA_VYBRANA = null;
+        toast(t("Třída smazána"));
+        novaTrida(); loadClass();
+      } else {
+        const stav = $("#tc-status");
+        stav.className = "tiny err";
+        stav.textContent = (r && r.detail) || t("nepovedlo se");
+      }
+    }, t("smazat"));
 }
 
 /* ---------------------------------------------- správa: zálohy a obnova */
@@ -1195,9 +1289,284 @@ async function saveSettings() {
   $("#set-err").textContent = (r && (r.detail || r.msg)) || "Uložení se nezdařilo.";
 }
 
+/* ------------------------------------------------------------------ banka úloh
+ * Jeden díl použít dvakrát: ve správě a v záložce Třída. Umí přenést úlohy
+ * dovnitř (odkaz na GitHub, nebo soubor z počítače), ven (celá banka, filtr,
+ * výběr) a pracovat s nimi hromadně i jednotlivě — založit, upravit, schválit,
+ * zahodit, smazat. Studenti sem nedosáhnou, komponenta se jim nikdy nekreslí.
+ */
+const BANKA_HTML = (i) => `
+  <p class="tiny muted">Vlož odkaz na repozitář nebo na soubor <code>ukoly.json</code>,
+    nebo vyber JSON z počítače. Úlohy, které projdou spuštěním, se schválí samy;
+    zbytek zůstane jako koncept ke čtení. Formát je v <code>docs/github.md</code>.</p>
+  <div class="row" style="gap:6px;flex-wrap:wrap">
+    <input id="${i("gh-url")}" placeholder="https://github.com/vlastnik/repo/ukoly.json"
+           autocomplete="off" spellcheck="false" style="flex:1;min-width:220px">
+    <button class="ghost js-gh" type="button">načíst z GitHubu</button>
+  </div>
+  <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
+    <input type="file" class="js-soubor" accept=".json,application/json" style="flex:1;min-width:220px">
+    <button class="ghost js-nahraj" type="button">nahrát ze souboru</button>
+  </div>
+  <p class="tiny" id="${i("gh-status")}" role="status"></p>
+  <div class="sep"></div>
+  <p class="tiny muted">Sem patří i <strong>datové soubory</strong> (CSV/TSV), na které se
+    úloha odkazuje — buď jsou součástí JSON jako pole <code>data</code>, nebo je nahraješ z počítače.</p>
+  <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
+    <input type="file" class="js-dat" accept=".csv,.tsv,.txt,text/csv" style="flex:1;min-width:200px">
+    <button class="ghost js-nahraj-data" type="button">nahrát data</button>
+    <label class="checkrow" style="margin:0"><input type="checkbox" class="js-prepsat"> přepsat existující</label>
+  </div>
+  <p class="tiny js-datovy" role="status"></p>
+  <div class="sep"></div>
+  <div class="row" style="gap:6px;flex-wrap:wrap">
+    <select class="js-stav" style="width:auto">
+      <option value="">vše</option><option value="approved">schválené</option>
+      <option value="draft">čeká na ověření</option><option value="retired">zahozené</option>
+    </select>
+    <select class="js-lekce" style="width:auto"><option value="">všechny lekce</option></select>
+    <input class="js-q" placeholder="hledat v názvu/zadání…" style="flex:1;min-width:150px">
+    <button class="ghost js-vse" type="button">vybrat vše</button>
+  </div>
+  <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">
+    <button class="ghost js-nova" type="button">založit novou úlohu</button>
+    <button class="ghost js-export" type="button">export vybraných</button>
+    <button class="ghost js-export-filtr" type="button">export podle filtru</button>
+    <button class="ghost js-export-banka" type="button">export celé banky</button>
+  </div>
+  <div style="overflow:auto;margin-top:10px"><table class="js-banka"></table></div>
+  <p class="tiny js-stavovy" role="status"></p>`;
+
+/** Nakreslí banku do nádoby a naváže ovládání. Podruhé jen přečte data. */
+function nakresliBanku(cil, predpona) {
+  if (!cil) return;
+  if (cil.dataset.banka === "1") { nactiBanku(cil); return; }
+  const id = (n) => (predpona ? predpona + "-" : "") + n;
+  cil.classList.add("banka");
+  cil.innerHTML = BANKA_HTML(id);
+  cil.dataset.banka = "1";
+  cil.querySelector(".js-gh").onclick = () => nacpiGithub(cil);
+  cil.querySelector(".js-nahraj").onclick = () => nahrejSoubor(cil);
+  cil.querySelector(".js-nahraj-data").onclick = () => nahrajData(cil);
+  cil.querySelector(".js-nova").onclick = () => novaUloha();
+  cil.querySelector(".js-vse").onclick = () => {
+    const zaci = [...cil.querySelectorAll(".js-vyber")];
+    const vse = zaci.length > 0 && zaci.every(pole => pole.checked);
+    zaci.forEach(pole => { pole.checked = !vse; });
+  };
+  cil.querySelector(".js-export").onclick = () => exportujBanku(cil, "vyber");
+  cil.querySelector(".js-export-filtr").onclick = () => exportujBanku(cil, "filtr");
+  cil.querySelector(".js-export-banka").onclick = () => exportujBanku(cil, "vse");
+  cil.querySelector(".js-stav").onchange = () => nactiBanku(cil);
+  cil.querySelector(".js-lekce").onchange = () => nactiBanku(cil);
+  cil.querySelector(".js-q").oninput = () => nactiBanku(cil);
+  nactiBanku(cil);
+  try {
+    const minule = localStorage.getItem("rpraxe.github");
+    const vstup = cil.querySelector("#" + id("gh-url"));
+    if (minule && vstup && !vstup.value) vstup.value = minule;
+  } catch (e) {}
+}
+
+/** Načte banku a vykreslí tabulku podle zrovna nastaveného filtru. */
+async function nactiBanku(cil) {
+  const tabulka = cil.querySelector(".js-banka");
+  hlaska = cil.querySelector(".js-stavovy");
+  if (!tabulka) return;
+  if (!tabulka.dataset.nacteno) tabulka.innerHTML = `<tr><td>${esc(t("načítám…"))}</td></tr>`;
+  let d;
+  try { d = await api("/api/tasks"); }
+  catch (e) { tabulka.innerHTML = `<tr><td>${esc(t("není spojení"))}</td></tr>`; return; }
+  const ulohy = d.tasks || [];
+  const lekce = cil.querySelector(".js-lekce");
+  if (lekce && lekce.options.length <= 1) {
+    lekce.innerHTML = `<option value="">${esc(t("všechny lekce"))}</option>`
+      + Object.keys(d.lessons || {}).map(n =>
+        `<option value="${esc(n)}">${esc(n)}. ${esc((d.lessons[n] || {}).title || n)}</option>`).join("");
+  }
+  const stav = cil.querySelector(".js-stav").value;
+  const poLekci = lekce.value;
+  const hledani = (cil.querySelector(".js-q").value || "").toLowerCase();
+  const viditelne = ulohy.filter(u =>
+    (!stav || u.status === stav) &&
+    (!poLekci || String(u.lesson) === String(poLekci)) &&
+    (!hledani || ((u.title || "") + " " + (u.zadani || "")).toLowerCase().includes(hledani)));
+  const popisek = { approved: t("schváleno"), draft: t("koncept"), retired: t("zahozeno") };
+  tabulka.dataset.nacteno = "1";
+  tabulka.innerHTML = `<tr><th></th><th>${esc(t("úloha"))}</th><th>${esc(t("lekce"))}</th>
+      <th>${esc(t("stav"))}</th><th>${esc(t("zdroj"))}</th><th></th></tr>`
+    + (viditelne.length ? viditelne.map(u => `<tr data-id="${esc(u.id)}">
+        <td><input type="checkbox" class="js-vyber" value="${esc(u.id)}"></td>
+        <td><strong>${esc(u.title)}</strong>
+          <div class="tiny muted">${esc((u.skills || []).join(", "))} · ${esc(u.id)}</div></td>
+        <td>${u.lesson}</td>
+        <td><span class="pill">${esc(popisek[u.status] || u.status)}</span></td>
+        <td class="tiny muted">${esc(u.source || "")}</td>
+        <td class="row" style="gap:4px;flex-wrap:wrap">
+          <button class="ghost js-upravit" type="button">${esc(t("upravit"))}</button>
+          ${u.status !== "approved" ? `<button class="ghost js-schvalit" type="button">${esc(t("schválit"))}</button>` : ""}
+          ${u.status !== "retired" ? `<button class="ghost js-zahodit" type="button">${esc(t("zahodit"))}</button>`
+                                   : `<button class="ghost js-vratit" type="button">${esc(t("vrátit zpět"))}</button>`}
+          <button class="ghost js-smazat" type="button">${esc(t("smazat"))}</button>
+        </td></tr>`).join("")
+      : `<tr><td colspan="6" class="muted">${esc(t("nic tu neodpovídá filtru"))}</td></tr>`);
+  hlaska.textContent = `${viditelne.length} ${t("z")} ${ulohy.length} ${t("úloh")}`;
+  cil.querySelectorAll(".js-upravit").forEach(tlacitko => tlacitko.onclick = async () => {
+    const id = tlacitko.closest("tr").dataset.id;
+    const u = await api(`/api/tasks/${id}`);
+    if (u && u.id) upravUlohu(u); else toast(t("úlohu jsem nenašel"));
+  });
+  cil.querySelectorAll(".js-schvalit").forEach(tlacitko =>
+    tlacitko.onclick = () => zmenStav(tlacitko.closest("tr").dataset.id, "approved"));
+  cil.querySelectorAll(".js-zahodit").forEach(tlacitko => tlacitko.onclick = () => {
+    const id = tlacitko.closest("tr").dataset.id;
+    potvrd(`${t("Opravdu zahodit")} ${id}? ${t("Studenti ji neuvidí; smazat se dá úplně později.")}`,
+      () => zmenStav(id, "retired"), t("zahodit"));
+  });
+  cil.querySelectorAll(".js-vratit").forEach(tlacitko =>
+    tlacitko.onclick = () => zmenStav(tlacitko.closest("tr").dataset.id, "draft"));
+  cil.querySelectorAll(".js-smazat").forEach(tlacitko => tlacitko.onclick = () => {
+    const id = tlacitko.closest("tr").dataset.id;
+    potvrd(`${t("Opravdu smazat")} ${id}? ${t("Historie pokusů zůstane, úloha zmizí.")}`,
+      async () => {
+        const r = await api(`/api/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (r && r.ok) { toast(`${id} ${t("smazána")}`); nactiBanku(cil); loadLib(); }
+        else toast((r && r.detail) || t("nepovedlo se"));
+      }, t("smazat"));
+  });
+}
+
+/** Dovoz z GitHubu — funguje v kterékoliv nádobě banky. */
+async function nacpiGithub(cil) {
+  cil = cil || document;
+  const hlaseni = cil.querySelector("#gh-status") || cil.querySelector(".js-stavovy");
+  const vstup = cil.querySelector("#gh-url");
+  const odkaz = ((vstup && vstup.value) || "").trim();
+  if (!odkaz) {
+    if (hlaseni) { hlaseni.className = "tiny err"; hlaseni.textContent = t("Vlož odkaz na repozitář nebo na soubor ukoly.json."); }
+    return;
+  }
+  if (hlaseni) { hlaseni.className = "tiny muted"; hlaseni.textContent = t("stahuji a přezkouším…"); }
+  let r;
+  try { r = await api("/api/github/import", { method: "POST", body: JSON.stringify({ odkaz }) }); }
+  catch (e) { r = { detail: t("server nedostupný") }; }
+  if (r && r.ok) {
+    if (hlaseni) {
+      hlaseni.className = "tiny ok";
+      hlaseni.textContent = `${r.pocet} ${t("přeneseno")}, ${r.schvaleno} ${t("schváleno")} — ${r.zdroj}`;
+    }
+    try { localStorage.setItem("rpraxe.github", odkaz); } catch (e) {}
+    nactiBanku(cil); loadLib();
+  } else if (hlaseni) {
+    hlaseni.className = "tiny err";
+    hlaseni.textContent = (r && (r.detail || r.zprava)) || t("nepovedlo se");
+  }
+}
+
+/** Dovoz ze souboru, který člověk vybere v prohlížeči. */
+async function nahrejSoubor(cil) {
+  const vstup = cil.querySelector(".js-soubor");
+  const hlaseni = cil.querySelector("#gh-status") || cil.querySelector(".js-stavovy");
+  const soubor = vstup && vstup.files && vstup.files[0];
+  if (!soubor) {
+    if (hlaseni) { hlaseni.className = "tiny err"; hlaseni.textContent = t("Nejdřív vyber soubor s úlohami."); }
+    return;
+  }
+  const text = await soubor.text();
+  if (hlaseni) { hlaseni.className = "tiny muted"; hlaseni.textContent = t("ověřuji a přenáším…"); }
+  let r;
+  try {
+    r = await api("/api/tasks/import", { method: "POST",
+      body: JSON.stringify({ data: text, jmeno: soubor.name }) });
+  } catch (e) { r = { detail: t("server nedostupný") }; }
+  if (r && r.ok) {
+    if (hlaseni) {
+      hlaseni.className = "tiny ok";
+      hlaseni.textContent = `${r.pocet} ${t("přeneseno")}, ${r.schvaleno} ${t("schváleno")} — ${soubor.name}`;
+    }
+    nactiBanku(cil); loadLib();
+  } else if (hlaseni) {
+    hlaseni.className = "tiny err";
+    hlaseni.textContent = (r && (r.detail || r.zprava)) || t("nepovedlo se");
+  }
+}
+
+/** Export: celá banka, filtr, nebo jen zaškrtnuté úlohy — JSON ke stažení. */
+async function exportujBanku(cil, zpusob) {
+  const parametry = new URLSearchParams();
+  hlaska = cil.querySelector(".js-stavovy");
+  if (zpusob === "filtr") {
+    if (cil.querySelector(".js-stav").value) parametry.set("status", cil.querySelector(".js-stav").value);
+    if (cil.querySelector(".js-lekce").value) parametry.set("lesson", cil.querySelector(".js-lekce").value);
+    if (cil.querySelector(".js-q").value) parametry.set("q", cil.querySelector(".js-q").value);
+  } else if (zpusob === "vyber") {
+    const idy = [...cil.querySelectorAll(".js-vyber")].filter(pole => pole.checked).map(pole => pole.value);
+    if (!idy.length) {
+      if (hlaska) { hlaska.className = "tiny err"; hlaska.textContent = t("Zaškrtni aspoň jednu úlohu."); }
+      return;
+    }
+    parametry.set("ids", idy.join(","));
+  }
+  const data = await api(`/api/tasks/export?${parametry.toString()}`);
+  if (!data || !data.ukoly) { toast((data && data.detail) || t("nepovedlo se")); return; }
+  const nazev = `ukoly-${zpusob === "vse" ? "banka" : zpusob}-${new Date().toISOString().slice(0, 10)}.json`;
+  const blob = new Blob([JSON.stringify({ ukoly: data.ukoly }, null, 2)], { type: "application/json" });
+  const odkaz = document.createElement("a");
+  odkaz.href = URL.createObjectURL(blob);
+  odkaz.download = nazev;
+  document.body.appendChild(odkaz);
+  odkaz.click();
+  odkaz.remove();
+  setTimeout(() => URL.revokeObjectURL(odkaz.href), 4000);
+  if (hlaska) { hlaska.className = "tiny ok"; hlaska.textContent = `${data.pocet} ${t("úloh v souboru")} ${nazev}`; }
+}
+
+/** Nahraje CSV/TSV do banky dat a doplní ji do seznamu. */
+async function nahrejSouborDat(cil, vstup, hlaseni, prepsat) {
+  const soubor = vstup && vstup.files && vstup.files[0];
+  if (!soubor) {
+    if (hlaseni) { hlaseni.className = "tiny err"; hlaseni.textContent = t("Nejdřív vyber datový soubor (.csv, .tsv, .txt)."); }
+    return;
+  }
+  const text = await soubor.text();
+  if (hlaseni) { hlaseni.className = "tiny muted"; hlaseni.textContent = `${soubor.name}: ${t("kontroluji a ukládám…")}`; }
+  let r;
+  try {
+    r = await api("/api/datasets", { method: "POST",
+      body: JSON.stringify({ jmeno: soubor.name, data: text, prepsat: !!prepsat }) });
+  } catch (e) { r = { detail: t("server nedostupný") }; }
+  if (r && r.ok) {
+    if (hlaseni) {
+      hlaseni.className = "tiny ok";
+      hlaseni.textContent = `${r.jmeno}: ${r.radku} ${t("řádků")}, ${t("sloupce")} ${r.sloupce.join(", ")}`;
+    }
+    nactiDatasety();
+  } else if (hlaseni) {
+    hlaseni.className = "tiny err";
+    hlaseni.textContent = (r && r.detail) || t("nepovedlo se");
+  }
+  return r;
+}
+
+function nahrajData(cil) {
+  return nahrejSouborDat(cil, cil.querySelector(".js-dat"),
+    cil.querySelector(".js-datovy"), cil.querySelector(".js-prepsat")?.checked);
+}
+
+/** Seznam datových souborů, aby šel ve formuláři vybrat místo opsání. */
+async function nactiDatasety() {
+  const seznam = document.getElementById("datasety");
+  if (!seznam) return;
+  let d;
+  try { d = await api("/api/datasets"); } catch (e) { return; }
+  seznam.innerHTML = (d.datasets || []).map(n => `<option value="${esc(n)}"></option>`).join("");
+}
+
 /* ------------------------------------------------------------------ třída */
 async function loadClass() {
   loadTridy();
+  const bankaTrida = $("#trida-banka");
+  if (bankaTrida) nakresliBanku(bankaTrida, "");
   const box = $("#class");
   if (!box) return;
   box.innerHTML = '<p class="muted tiny">načítám…</p>';
@@ -1232,6 +1601,53 @@ async function showStudent(user) {
      <td>${esc(a.title || a.task)}</td><td>${a.ok ? "✓" : "✗"}</td></tr>`).join("");
 }
 
+/** Otevře dialog s úlohou — prázdný argument znamená úplně vlastní úloha. */
+function otorEditor(u) {
+  const modal = $("#taskmodal");
+  if (!modal) return;
+  const vloz = (id, hodnota) => { const prvek = $(id); if (prvek) prvek.value = hodnota ?? ""; };
+  const upravuje = !!(u && u.id);
+  vloz("#nt-id", upravuje ? u.id : "");
+  vloz("#nt-title", upravuje ? u.title : "");
+  vloz("#nt-lesson", upravuje ? u.lesson : 4);
+  vloz("#nt-min", upravuje ? u.minutes : 4);
+  vloz("#nt-level", upravuje ? u.level : 2);
+  vloz("#nt-skills", upravuje ? (u.skills || []).join(", ") : "");
+  vloz("#nt-dataset", upravuje ? (u.dataset || "") : "");
+  vloz("#nt-nacti", upravuje ? u.nacti : "");
+  vloz("#nt-starter", upravuje ? u.starter : "");
+  vloz("#nt-zadani", upravuje ? u.zadani : "");
+  vloz("#nt-reseni", upravuje ? u.reseni : "");
+  vloz("#nt-check", upravuje ? (u.check ?? u.check_r) : "");
+  const napovedy = upravuje ? (u.hints || []) : [];
+  vloz("#nt-hints", Array.isArray(napovedy) ? napovedy.join("\n") : String(napovedy || ""));
+  const titulek = $("#taskeditor-title");
+  if (titulek) titulek.textContent = upravuje ? `${t("Úprava úlohy")} ${u.id}` : t("Nová úloha");
+  const hint = $("#nt-edit");
+  if (hint) hint.style.display = upravuje ? "" : "none";
+  // data do banky nahrává jen učitel a správce — žák si vystačí s těmi, která už v bance jsou
+  ["#nt-dat", "#nt-dat-nahrat"].forEach((id) => {
+    const prvek = $(id);
+    if (prvek) prvek.style.display = ["teacher", "admin"].includes(ROLE) ? "" : "none";
+  });
+  const stav = $("#nt-status");
+  if (stav) { stav.className = "tiny"; stav.textContent = ""; }
+  modal.hidden = false;
+  const prvni = $("#nt-title");
+  if (prvni) setTimeout(() => prvni.focus(), 30);
+}
+
+function zavriEditor() {
+  const modal = $("#taskmodal");
+  if (modal) modal.hidden = true;
+}
+
+/** Učitel otevře existující úlohu — před uložením se zase ověří spuštěním. */
+function upravUlohu(u) { nactiDatasety(); otorEditor(u); }
+
+/** Úplně vlastní úloha od nuly. */
+function novaUloha() { nactiDatasety(); otorEditor(null); }
+
 async function saveTask(pres) {
   const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
   const body = {
@@ -1254,14 +1670,19 @@ async function saveTask(pres) {
   st.textContent = body.kontrola_ai ? t("spouštím v sandboxu a nechám to číst modelem…")
                                     : t("ověřuji spuštěním…");
   $("#nt-save").disabled = true; if ($("#nt-force")) $("#nt-force").disabled = true;
+  if (ROLE === "student") { delete body.kontrola_ai; delete body.pres; }
   let r;
-  try { r = await api("/api/tasks", { method: "POST", redirect401: false, body: JSON.stringify(body) }); }
+  try {
+    r = await api(ROLE === "student" ? "/api/own" : "/api/tasks",
+                  { method: "POST", redirect401: false, body: JSON.stringify(body) });
+  }
   catch (e) { r = { detail: t("server nedostupný") }; }
   $("#nt-save").disabled = false; if ($("#nt-force")) $("#nt-force").disabled = false;
   if (r && r.ulozeno && r.ok) {
     st.className = "tiny ok";
     st.textContent = `${t("úloha")} ${r.id} ${t("uložena a schválena")}`;
     $("#nt-id").value = r.id;
+    if (ROLE === "student") { setTimeout(() => { zavriEditor(); loadLib(); }, 900); }
   } else if (r && r.ulozeno) {
     st.className = "tiny err";
     st.textContent = `${t("uloženo jako koncept — studenti ji nevidí")}: ${r.zprava || ""}`;
@@ -1316,9 +1737,14 @@ async function loadAdmin() {
 
   renderAICard();
 
-  $("#adm-bank").innerHTML = `<p class="tiny">${s.tasks} úloh · lekce ${s.lesson_current} je aktuální</p>
-    <p class="tiny muted">datasets: ${esc((s.datasets || []).slice(0, 6).join(", "))}${(s.datasets||[]).length>6?" …":""}</p>
-    ${s.agent_note ? `<p class="tiny muted" style="margin-top:8px;white-space:pre-wrap">${esc(s.agent_note)}</p>` : ""}`;
+  const bankaAdmin = $("#adm-bank");
+  if (bankaAdmin) {
+    bankaAdmin.innerHTML = `<p class="tiny">${s.tasks} ${t("úloh")} · lekce ${s.lesson_current} ${t("je aktuální")}</p>
+      <p class="tiny muted">datasets: ${esc((s.datasets || []).slice(0, 6).join(", "))}${(s.datasets || []).length > 6 ? " …" : ""}</p>
+      ${s.agent_note ? `<p class="tiny muted" style="margin-top:8px;white-space:pre-wrap">${esc(s.agent_note)}</p>` : ""}
+      <div class="banka" id="adm-banka"></div>`;
+    nakresliBanku($("#adm-banka"), "ab");
+  }
 }
 
 async function setNewPassword(name) {
@@ -1420,6 +1846,8 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-refresh").onclick = () => potvrd("Složit novou dnešní dávku? Dosavadní pokusy zůstanou v historii.",
     async () => { await api("/api/plan?refresh=1"); await loadBoot(); }, "nová dávka");
   $("#budget").onchange = async () => { await api(`/api/plan?minutes=${$("#budget").value}`); await loadBoot(); };
+  const tlacitkoNové = $("#btn-nova");
+  if (tlacitkoNové) tlacitkoNové.onclick = () => novaUloha();
   $("#btn-gen").onclick = async () => {
     $("#genstatus").textContent = "AI píše a ověřuje… (třeba minuta)";
     const r = await api("/api/generate?count=2", { method: "POST" });
@@ -1455,7 +1883,19 @@ window.addEventListener("DOMContentLoaded", () => {
   if ($("#nt-force")) $("#nt-force").onclick = () => saveTask(true);
   if ($("#tc-new")) $("#tc-new").onclick = novaTrida;
   if ($("#tc-save")) $("#tc-save").onclick = ulozTridu;
-  if ($("#tc-del")) $("#tc-del").onclick = smazTridu;
+  if ($("#tc-del")) $("#tc-del").onclick = () => smazTridu(TRIDA_VYBRANA);
+  $$(".js-nova-uloha").forEach(tlacitko => { tlacitko.onclick = novaUloha; });
+  try {
+    const minule = localStorage.getItem("rpraxe.github");
+    if (minule && $("#gh-url")) $("#gh-url").value = minule;
+  } catch (e) {}
+  if ($("#taskmodal-close")) $("#taskmodal-close").onclick = zavriEditor;
+  if ($("#nt-dat-nahrat")) $("#nt-dat-nahrat").onclick = async () => {
+    const r = await nahrejSouborDat(document, $("#nt-dat"), $("#nt-dat-status"), $("#nt-dat-prepsat")?.checked);
+    if (r && r.ok) $("#nt-dataset").value = r.jmeno;
+  };
+  const dialogEditor = $("#taskmodal");
+  if (dialogEditor) dialogEditor.onclick = (e) => { if (e.target.id === "taskmodal") zavriEditor(); };
   $("#nt-clear").onclick = () => {
     ["nt-id", "nt-title", "nt-skills", "nt-dataset", "nt-nacti", "nt-starter", "nt-zadani",
      "nt-reseni", "nt-check", "nt-hints"].forEach(id => { $("#" + id).value = ""; });
@@ -1483,6 +1923,7 @@ window.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", e => {
     if (e.key !== "Escape") return;
     closePassword(); closeUserMenu();
+    zavriEditor();
     ["#setmodal", "#notemodal", "#okmodal", "#askmodal"].forEach(s => { const el = $(s); if (el) el.hidden = true; });
   });
   document.addEventListener("click", (e) => {

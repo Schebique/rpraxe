@@ -271,25 +271,25 @@ check("návrat do češtiny", /Dnes|Tah\u00e1k|Progres/.test(navText()) && !/Pro
     const text = (karta?.textContent || "").replace(/\s+/g, " ");
     check("záložka Třída má kartu Třídy", !!karta, text.slice(0, 80));
     check("existuje formulář pro novou třídu", !!d.querySelector("#tc-name") && !!d.querySelector("#tc-zaci"));
-    const vyber = d.querySelector("#tc-zaci");
-    const mozni = [...(vyber?.options || [])].map(o => o.value).filter(Boolean);
-    check("ze seznamu jde vybrat žáky", mozni.length > 0, mozni.join(","));
-    if (mozni.length) {
+    const zaci = [...d.querySelectorAll("#tc-zaci input[type=checkbox]")].map(i => i.value).filter(Boolean);
+    const trida_uciteli = !d.querySelector("#nav-class")?.hidden;
+    check(trida_uciteli ? "žáky jde zaškrtnout i odebrat" : "student třídu nespravuje",
+          trida_uciteli ? zaci.length > 0 : true, zaci.join(", ") || "skryto");
+    if (zaci.length) {
       d.querySelector("#tc-name").value = "Skupina B — test";
-      [...vyber.options].forEach(o => { o.selected = o.value === mozni[0]; });
-      d.querySelector("#tc-save").click(); await sleep(2000);
+      d.querySelectorAll("#tc-zaci input").forEach(pole => { pole.checked = pole.value === zaci[0]; });
+      d.querySelector("#tc-save").click(); await sleep(2200);
       const stav = (d.querySelector("#tc-status")?.textContent || "").trim();
-      check("třídu lze založit a přiřadit žáka", /Ulòžena|uložena/i.test(stav), stav.slice(0, 80));
+      check("třídu lze založit a přiřadit žáka", /uložena/i.test(stav), stav.slice(0, 90));
       const seznam = (d.querySelector("#tridy")?.textContent || "").replace(/\s+/g, " ");
       check("založená třída je vidět v seznamu", seznam.includes("Skupina B"), seznam.slice(0, 90));
-      // úklid: smaž ji, ať test nenechá stopu — Dialog chce opsat slovo SMAZAT
+      // úklid: vyber ji a smaž přes potvrzovací dialog, ať test nenechá stopu
       const kartaB = [...d.querySelectorAll("#tridy .trida")].find(b => b.textContent.includes("Skupina B"));
       if (kartaB) {
-        kartaB.click(); await sleep(700);
-        d.querySelector("#tc-del").click(); await sleep(400);
-        const pole = d.querySelector("#ask-input");
-        if (pole) { pole.value = "SMAZAT"; d.querySelector("#ask-yes").click(); }
-        await sleep(1800);
+        kartaB.querySelector(".js-smaz-tridu").click(); await sleep(500);
+        const ano = d.querySelector("#ok-yes");
+        if (ano) ano.click();
+        await sleep(2000);
         const po = (d.querySelector("#tridy")?.textContent || "").replace(/\s+/g, " ");
         check("třídu lze i smazat", !po.includes("Skupina B"), po.slice(0, 90));
       }
@@ -305,9 +305,9 @@ check("návrat do češtiny", /Dnes|Tah\u00e1k|Progres/.test(navText()) && !/Pro
     admin.click(); await sleep(2500);
     const sada = d.querySelector("#v-admin .adminrows");
     check("správa je rozdělená na cel šířku (žádný úzký sloupec)",
-          !!sada && !d.querySelector("#v-admin .grid.g2 #adm-zaloha"),
+          !!sada && !d.querySelector("#v-admin .grid.g2 #adm-backups"),
           sada ? sada.className : "chybí .adminrows");
-    check("karta záloh je součástí vodorovného dělení", !!d.querySelector(".adminrows #adm-zaloha"));
+    check("karta záloh je součástí vodorovného dělení", !!d.querySelector(".adminrows #adm-backups"));
     check("přehled má KPI řádek", !!d.querySelector("#admin-kpi, #adm-kpi, .kpi"));
   }
 }
@@ -331,6 +331,30 @@ check("návrat do češtiny", /Dnes|Tah\u00e1k|Progres/.test(navText()) && !/Pro
     } else {
       check("koncept lze otevřít v editoru", true, "žádný koncept právě není — netestováno");
     }
+  }
+}
+
+/* 4b5) banka úloh štábu vs. žákovské tlačítka */
+{
+  const lib = [...d.querySelectorAll("nav button")].find(b => b.dataset.view === "lib");
+  const pracovnik = !d.querySelector("#nav-class")?.hidden;
+  if (pracovnik) {
+    if (lib) { lib.click(); await sleep(1800); }
+    const banka = d.querySelector("#trida-banka");
+    check("ve Třídě je banka úloh", !!banka);
+    check("banka umí přenést odkaz i soubor",
+          !!d.querySelector('#trida-banka input[id$="gh-url"]')
+          && d.querySelectorAll("#trida-banka input[type=file]").length >= 2,
+          [...d.querySelectorAll("#trida-banka input")].slice(0,6).map(x => x.id || x.type).join(",") + " / " + d.querySelectorAll("#trida-banka input").length + " vstupů");
+    check("banka umí export a hromadné zásahy",
+          /export/i.test(banka?.textContent || "") && /schv[a-z|lit]+|smazat/i.test(banka?.textContent || ""));
+    check("banka umí založit vlastní úlohu", /vlastn/i.test(banka?.textContent || ""));
+    if (lib) { lib.click(); await sleep(400); }
+  } else {
+    if (lib) { lib.click(); await sleep(1800); }
+    check("žák má v knihovně své zahodit", !!d.querySelector("#tasks .my-drop"));
+    check("žák si může napsat vlastní úlohu", !!d.querySelector("#btn-nova"));
+    check("žák nevidí tlačítka banky", !d.querySelector("#tasks .schvalit"));
   }
 }
 
