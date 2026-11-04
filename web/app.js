@@ -630,6 +630,16 @@ async function loadAdmin() {
     (bk.local || []).map(f => `<li>${esc(f.name)} · ${(f.bytes / 1024).toFixed(0)} kB ·
       ${new Date(f.mtime * 1000).toLocaleString("cs-CZ")}</li>`).join("") + "</ul>";
 
+  const sso = s.sso || {};
+  $("#adm-login").innerHTML = `<p class="tiny">${sso.zapnuto ? "✓ heslo + brána" : "✓ přihlášení heslem"}</p>
+    <p class="tiny muted">${esc(sso.popis || "")}</p>` +
+    (sso.zapnuto
+      ? `<p class="tiny muted">hlavička jméno: <code>${esc(sso.hlavka_jmeno)}</code>${
+          sso.hlavka_role ? `, role: <code>${esc(sso.hlavka_role)}</code>` : ""}</p>`
+      : `<p class="tiny muted">Přihlášení přes bránu (SSO) se zapne v <code>rpraxe.env</code>:
+          <code>RPRAXE_SSO_SECRET</code> a <code>RPRAXE_SSO_HEADER</code> — pak se na přihlašovací
+          stránce objeví druhé tlačítko. Postup a vzor pro Caddy/Authelia je v <code>docs/sso.md</code>.</p>`);
+
   $("#adm-ai").innerHTML = `<p class="tiny">${s.ai_online ? "✓ model dostupný" : "✗ model nedostupný"}</p>
     <p class="tiny muted">píše: <code>${esc(s.model_write)}</code></p>
     <ul class="tiny muted">` + (s.models || []).map(m => `<li><code>${esc(m)}</code></li>`).join("") + "</ul>";
@@ -641,22 +651,46 @@ async function loadAdmin() {
 
 async function setNewPassword(name) {
   /* heslo se NEptá přes prompt() — vlastní dialog, vícerádkový, bez blokujícího okna */
-  const pw = await ptat(`Nové heslo pro účet ${name}`, "heslo (aspoň 8 znaků)", "text");
-  if (!pw) return;
+  let pw = await ptat(`Nové heslo pro účet ${name}`, "heslo (aspoň 8 znaků) — nebo nech prázdné a vygeneruju",
+                      "password", true);
+  if (pw === null || pw === undefined) return;
+  if (!pw) pw = vyhheslo();
+  if (pw.length < 8) { toast("heslo musí mít aspoň 8 znaků"); return; }
   const r = await api(`/api/users/${encodeURIComponent(name)}/password`,
     { method: "POST", redirect401: false, body: JSON.stringify({ user: name, password: pw }) });
-  toast(r && r.ok ? `heslo pro ${name} nastaveno` : ((r && r.detail) || "nepovedlo se"));
+  toast(r && r.ok ? `heslo pro ${name}: ${pw}` : ((r && r.detail) || "nepovedlo se"));
+}
+
+/**
+ * Heslo jako čtyři slabiky + dva znaky: krátké na opsání hlasem, dost dlouhé na
+ * to, aby ho neuhodl skript. Nevytváříme si iluzi bankovního hesla — účet je
+ * doma v LAN a po prvním přihlášení si člověk heslo změní.
+ */
+function vyhheslo() {
+  const hlasky = ["ka", "ne", "mi", "tov", "ple", "rdu", "sti", "kve", "lom", "ben", "drs", "tyk",
+                  "hrad", "vice", "slun", "rove", "poto", "kamy", "vetr", "list"];
+  const vyber = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const cislice = () => String(Math.floor(Math.random() * 100)).padStart(2, "0");
+  let slovo = "";
+  do { slovo = vyber(hlasky) + vyber(hlasky) + vyber(hlasky) + vyber(hlasky) + cislice(); }
+  while (slovo.length < 12);
+  return slovo;
 }
 
 /** Malý dotazovací dialog s jedním polem — náhrada za window.prompt. */
-function ptat(title, placeholder, type = "text") {
+function ptat(title, placeholder, type = "text", generuj = false) {
   return new Promise(resolve => {
     let box = $("#askmodal");
     if (!box) {
       box = document.createElement("div");
       box.className = "modal"; box.id = "askmodal"; box.hidden = true;
       box.innerHTML = `<div class="card pwcard"><h3 id="ask-title"></h3>
-        <input id="ask-input" autocomplete="off">
+        <span class="pw"><input id="ask-input" autocomplete="off">
+        <button class="eye" type="button" data-eye="ask-input" aria-pressed="false"
+                title="ukázat heslo" aria-label="ukázat heslo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+          <circle cx="12" cy="12" r="3"/></svg></button></span>
+        <button id="ask-gen" type="button" class="ghost">vygenerovat</button>
         <p class="err tiny" id="ask-err"></p>
         <div class="row end"><button id="ask-no" type="button" class="ghost">zrušit</button>
         <button id="ask-yes" type="button" class="primary">uložit</button></div></div>`;
@@ -665,6 +699,14 @@ function ptat(title, placeholder, type = "text") {
     $("#ask-title").textContent = title;
     const inp = $("#ask-input");
     inp.type = type; inp.placeholder = placeholder; inp.value = "";
+    inp.autocomplete = type === "password" ? "new-password" : "off";
+    $("#askmodal .pw").style.display = type === "password" ? "" : "none";
+    $("#ask-gen").style.display = generuj ? "" : "none";
+    $("#ask-gen").onclick = () => {
+      inp.value = vyhheslo(); inp.type = "text";
+      const oko = document.querySelector('[data-eye="ask-input"]');
+      if (oko) oko.setAttribute("aria-pressed", "true");
+    };
     $("#ask-err").textContent = "";
     box.hidden = false; inp.focus();
     const done = (val) => { box.hidden = true; inp.onkeydown = null; resolve(val); };
@@ -711,6 +753,27 @@ window.addEventListener("DOMContentLoaded", () => {
     const r = await api("/api/generate?count=2", { method: "POST" });
     $("#genstatus").textContent = r.created.map(c => `${c.title}: ${c.validated ? "ověřeno" : "zastaveno"}`).join(" · ") || "nic nevzniklo";
     loadLib();
+  };
+  document.addEventListener("click", e => {
+    const tlacitko = e.target.closest && e.target.closest("[data-eye]");
+    if (!tlacitko) return;
+    const pole = document.getElementById(tlacitko.dataset.eye);
+    if (!pole) return;
+    const odhaleno = pole.type === "password";
+    pole.type = odhaleno ? "text" : "password";
+    tlacitko.setAttribute("aria-pressed", String(odhaleno));
+    tlacitko.title = odhaleno ? "skrýt heslo" : "ukázat heslo";
+    tlacitko.setAttribute("aria-label", tlacitko.title);
+    pole.focus();
+  });
+  $("#nu-gen").onclick = () => {
+    const heslo = vyhheslo();
+    const pole = $("#nu-pass");
+    pole.value = heslo; pole.type = "text";
+    const eye = document.querySelector('[data-eye="nu-pass"]');
+    if (eye) { eye.setAttribute("aria-pressed", "true"); eye.title = "skrýt heslo"; }
+    $("#nu-status").className = "tiny ok";
+    $("#nu-status").textContent = `vygenerováno: ${heslo} — zkopíruj si ho, po založení už ho neuvidíš`;
   };
   $("#btn-settings").onclick = openSettings;
   $("#set-cancel").onclick = () => { $("#setmodal").hidden = true; };

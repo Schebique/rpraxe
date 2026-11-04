@@ -136,6 +136,35 @@ if (btnNote) {
   }
 }
 
+/* 3b) heslo u nového účtu: zakryté, očičko ho odhalí, generátor dodá dlouhé */
+const adminBtn = [...d.querySelectorAll("nav button")].find(b => b.dataset.view === "admin" && !b.hidden);
+if (adminBtn) {
+  adminBtn.click(); await sleep(1700);
+  const poleHeslo = d.querySelector("#nu-pass");
+  check("pole heslo je type=password", poleHeslo && poleHeslo.type === "password", poleHeslo ? poleHeslo.type : "nic");
+  const oko = d.querySelector('[data-eye="nu-pass"]');
+  check("očičko u hesla existuje", !!oko);
+  if (oko && poleHeslo) {
+    oko.click(); await sleep(200);
+    check("očičko heslo odhalí", poleHeslo.type === "text", poleHeslo.type);
+    oko.click(); await sleep(200);
+    check("očičko heslo zase skryje", poleHeslo.type === "password", poleHeslo.type);
+  }
+  d.querySelector("#nu-gen").click(); await sleep(300);
+  check("generátor dá heslo aspoň 12 znaků", (poleHeslo.value || "").length >= 12,
+        `${(poleHeslo.value || "").length} znaků`);
+}
+
+/* 3c) po odhlášení musí jít otevřít přihlašovací stránku (dřív byla 405 Method Not Allowed) */
+{
+  const c = jar;
+  await raw("GET", "/logout", null);
+  const r = await fetch(BASE + "/login", { redirect: "manual" });
+  const text = await r.text();
+  check("GET /login bez cookie vrátí formulář", r.status === 200 && /name="pass"/.test(text), `HTTP ${r.status}`);
+  jar = c;
+}
+
 /* 4) nastavení: motiv, jazyk, model */
 d.querySelector("#btn-settings").click();
 await sleep(400);

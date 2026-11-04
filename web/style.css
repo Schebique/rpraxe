@@ -25,6 +25,15 @@ h1,h2,h3{line-height:1.25;margin:0 0 .4em}
 h1{font-size:26px} h2{font-size:19px} h3{font-size:15px}
 button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--bg3);color:var(--fg);padding:7px 13px}
 button:hover{border-color:var(--accent);background:var(--hover)}
+/* pole s heslem + očko na odhalení */
+.pw{position:relative;display:inline-flex;align-items:center}
+.pw input{padding-right:34px}
+.eye{position:absolute;right:4px;width:26px;height:26px;padding:0;display:grid;place-items:center;
+  border:none;background:transparent;color:var(--dim)}
+.eye:hover{border:none;background:transparent;color:var(--accent)}
+.eye svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.eye[aria-pressed="true"]{color:var(--accent)}
+.eye[aria-pressed="true"] svg{stroke-width:2.4}
 button.primary{background:var(--accent);border-color:var(--accent);color:#0b1020;font-weight:650}
 button.primary:hover{filter:brightness(1.12)}
 button.ghost{background:transparent}

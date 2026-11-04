@@ -102,6 +102,14 @@ LOGIN_PAGE = """<!doctype html><html lang="cs"><head><meta charset="utf-8">
 </form></body></html>"""
 
 
+@app.get("/login")
+def login_page(request: Request):
+    """Po odhlášení sem přiletí 303 z /logout — bez toho by prohlížeč ukázal 405."""
+    if current_user(request):
+        return RedirectResponse("/", status_code=303)
+    return HTMLResponse(LOGIN_PAGE.format(user="", err="", sso=sso_button()))
+
+
 @app.post("/login")
 def login(response: Response, user: str = Form(...), pas: str = Form("", alias="pass")):
     users = ensure_users()

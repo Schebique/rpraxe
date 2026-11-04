@@ -194,10 +194,16 @@
     <section class="view" id="v-admin">
       <div class="grid g3" id="admin-kpis"></div>
       <div class="grid g2" style="margin-top:14px">
-        <div class="card"><h3>Účty</h3><div style="overflow:auto"><table id="adm-users"></table></div>
+                <div class="card"><h3>Účty</h3><div style="overflow:auto"><table id="adm-users"></table></div>
           <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
-            <input id="nu-name" placeholder="jméno účtu" style="width:140px">
-            <input id="nu-pass" placeholder="heslo (min. 8)" type="text" style="width:150px">
+            <input id="nu-name" placeholder="jméno účtu" autocomplete="off" style="width:140px">
+            <span class="pw"><input id="nu-pass" placeholder="heslo (min. 8)" type="password"
+                                    autocomplete="new-password" style="width:150px">
+              <button class="eye" type="button" data-eye="nu-pass" aria-pressed="false"
+                      title="ukázat heslo" aria-label="ukázat heslo">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button></span>
+            <button id="nu-gen" class="ghost" type="button" title="navrhnout bezpečné heslo">vygenerovat</button>
             <select id="nu-role" style="width:120px"></select>
             <button id="nu-add" class="ghost" type="button">přidat účet</button>
           </div>
@@ -207,6 +213,7 @@
             <button id="adm-backup" class="ghost" type="button">udělat snímek teď</button></div>
           <p class="tiny muted">Noční kopie na NAS dělá skript <code>rpraxe-zaloha.sh</code>;
             tohle je ruční snímek databáze v <code>state/backups</code>.</p></div>
+        <div class="card"><h3>Přihlašování</h3><div id="adm-login"></div></div>
         <div class="card"><h3>AI</h3><div id="adm-ai"></div></div>
         <div class="card"><h3>Banka úloh</h3><div id="adm-bank"></div></div>
       </div>
@@ -267,11 +274,11 @@
     <h3 id="pw-title">Změna hesla</h3>
     <p class="tiny muted">Heslo se mění jen pro tento účet, doma na serveru. Neodhlasuje tě to.</p>
     <label for="pw-cur">současné heslo</label>
-    <input id="pw-cur" type="password" autocomplete="current-password">
+    <span class="pw"><input id="pw-cur" type="password" autocomplete="current-password"><button class="eye" type="button" data-eye="pw-cur" aria-pressed="false" title="ukázat heslo" aria-label="ukázat heslo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span>
     <label for="pw-new">nové heslo</label>
-    <input id="pw-new" type="password" autocomplete="new-password">
+    <span class="pw"><input id="pw-new" type="password" autocomplete="new-password"><button class="eye" type="button" data-eye="pw-new" aria-pressed="false" title="ukázat heslo" aria-label="ukázat heslo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span>
     <label for="pw-rep">nové heslo znovu</label>
-    <input id="pw-rep" type="password" autocomplete="new-password">
+    <span class="pw"><input id="pw-rep" type="password" autocomplete="new-password"><button class="eye" type="button" data-eye="pw-rep" aria-pressed="false" title="ukázat heslo" aria-label="ukázat heslo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span>
     <p class="err tiny" id="pw-err" role="alert"></p>
     <div class="row end">
       <button id="pw-cancel" type="button" class="ghost">zrušit</button>

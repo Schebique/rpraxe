@@ -91,7 +91,8 @@ def register(app: APIRouter, ctx) -> None:
             "models": models, "default_model": ai.MODEL_CHAT,
             "langs": LANGS, "themes": list(THEMES), "budgets": list(BUDGETS),
             "ai_online": bool(models),
-            "sso": {"possible": bool(os.environ.get("RPRAXE_SSO_HEADER")),
+            "sso": {"zapnuto": bool(os.environ.get("RPRAXE_SSO_SECRET")),
+                    "hlavka": os.environ.get("RPRAXE_SSO_HEADER", "Remote-User"),
                     "gateway": bool(os.environ.get(SSO_SECRET_ENV))},
         }
 
@@ -313,6 +314,16 @@ def register(app: APIRouter, ctx) -> None:
             "lesson_current": ctx.syllabus.current_lesson(),
             "backups": ctx.backup_status(),
             "version": ctx.VERSION,
+            # aby bylo vidět, jest se přihlašuje přes bránu, nebo jen heslem
+            "sso": {
+                "zapnuto": bool(os.environ.get("RPRAXE_SSO_SECRET")
+                                and os.environ.get("RPRAXE_SSO_HEADER")),
+                "hlavka_jmeno": os.environ.get("RPRAXE_SSO_HEADER", ""),
+                "hlavka_role": os.environ.get("RPRAXE_SSO_ROLE_HEADER", ""),
+                "popis": ("přihlášení přes bránu je zapnuté"
+                          if os.environ.get("RPRAXE_SSO_SECRET") and os.environ.get("RPRAXE_SSO_HEADER")
+                          else "přihlašuje se jen heslem — RPRAXE_SSO_SECRET není nastavený"),
+            },
         }
 
     app.include_router(router)
