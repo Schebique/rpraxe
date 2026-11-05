@@ -27,6 +27,8 @@ from pydantic import BaseModel
 
 from app import accounts, adaptive, ai, config as instance, store
 
+_SANDBOX_CACHE = (0.0, {})
+
 LANGS = {"cs": "čeština", "en": "English", "sk": "slovenčina", "de": "Deutsch", "pl": "polština"}
 THEMES = ("auto", "dark", "light")
 BUDGETS = (10, 15, 20, 30, 45, 60)
@@ -410,20 +412,51 @@ def register(app: APIRouter, ctx) -> None:
 
     @router.get("/api/class/{student}")
     def api_class_one(request: Request, student: str, days: int = 90):
-        staff(request)
+        """Pohled na jednoho žáka: progres, dnešní dávka, poslední pokusy, jeho poznámky."""
+        kdo, role = staff(request)
         users = ctx.ensure_users()
         if student not in users:
             raise HTTPException(404, "takový účet není")
         with ctx.db() as c:
+            if role != "admin" and student not in _zaci_ucitele(c, kdo):
+                raise HTTPException(403, "tenhle žák není ve tvé třídě")
             st = store.user_stats(c, student, days=min(days, 365))
-            st["plan_today"] = c.execute(
-                "SELECT task_ids, minutes FROM plan WHERE day=? AND user=?",
-                (ctx.today(), student)).fetchone()
+            plan = c.execute("SELECT task_ids, minutes FROM plan WHERE day=? AND user=?",
+                             (ctx.today(), student)).fetchone()
+            st["plan_today"] = plan
             st["recent"] = [dict(r) for r in c.execute(
                 "SELECT a.ts, a.task, t.title, a.ok, a.hints FROM attempts a "
                 "LEFT JOIN tasks t ON t.id=a.task WHERE a.user=? ORDER BY a.ts DESC LIMIT 12",
                 (student,))]
+            # poznámky jsou soukromá poznámka žáka k úloze — učitel je vidí,
+            # ale nemůže do nich sahat; pomáhá to najit špatné zadání
+            st["poznamky"] = [dict(r) for r in c.execute(
+                """SELECT f.ts, f.task, COALESCE(t.title, f.task) AS titulek, f.text
+                     FROM feedback f LEFT JOIN tasks t ON t.id = f.task
+                    WHERE f.user = ? AND f.kind = 'note'
+                    ORDER BY f.ts DESC LIMIT 40""", (student,))]
+            st["skoly"] = _skolni_prehled(c, student)
         return st
+
+    def _zaci_ucitele(c, ucitel: str) -> list[str]:
+        """Žáci, které učitel vede aspoň v jedné třídě."""
+        return [r["student"] for r in c.execute(
+            "SELECT DISTINCT cs.student FROM class_students cs JOIN classes cl ON cl.id=cs.class "
+            "WHERE cl.teacher = ?", (ucitel,))]
+
+    def _skolni_prehled(c, student: str) -> dict:
+        """Co žák dluží: dnešní dávka versus co už stihl."""
+        plan = c.execute("SELECT task_ids, minutes FROM plan WHERE day=? AND user=?",
+                         (ctx.today(), student)).fetchone()
+        hotovo = c.execute("SELECT COUNT(*) FROM attempts WHERE user=? AND ok=1 "
+                           "AND date(ts,'unixepoch','localtime')=?",
+                           (student, ctx.today())).fetchone()[0]
+        try:
+            ids = json.loads(plan["task_ids"]) if plan and plan["task_ids"] else []
+        except (json.JSONDecodeError, TypeError):
+            ids = []
+        return {"nacteno": len(ids), "hotovo": hotovo,
+                "plan_min": int(plan["minutes"]) if plan else 0}
 
     # ------------------------------------------------------ úlohy (učitel)
 
@@ -513,8 +546,13 @@ def register(app: APIRouter, ctx) -> None:
     def api_users(request: Request):
         is_admin(request)
         users = ctx.ensure_users()
+        with ctx.db() as c:
+            naposledy = {r["user"]: r["ts"] for r in c.execute(
+                "SELECT user, MAX(ts) ts FROM attempts GROUP BY user")}
         return {"users": [{"user": k, "role": v.get("role", "student"),
-                           "changed": v.get("changed"), "generated_pw": bool(v.get("first_pw"))}
+                           "changed": v.get("changed"), "generated_pw": bool(v.get("first_pw")),
+                           "prihlasen": v.get("last_login") or naposledy.get(k) or 0,
+                           "uloh_vlastnich": 0}
                           for k, v in sorted(users.items())],
                 "roles": list(accounts.ROLES)}
 
@@ -551,9 +589,44 @@ def register(app: APIRouter, ctx) -> None:
             raise HTTPException(404, "účet nenalezen")
         if name == admin and body.role != "admin":
             raise HTTPException(422, "sám sobě nemůžeš vzít roli správce")
-        users[name] = {**users[name], "role": accounts.normalize_role(body.role)}
+        users[name] = {**users[name], "role": accounts.normalize_role(body.role),
+                       "role_ruce": time.strftime("%Y-%m-%d %H:%M")}   # env už roli nesahne
         ctx._users_save(users)
         return {"ok": True, "user": name, "role": users[name]["role"]}
+
+    @router.post("/api/users/{name}/logout")
+    def api_user_logout(request: Request, name: str):
+        """Odhlásí účet ze všech zařízení — hodí se po ztraceném notebooku."""
+        is_admin(request)
+        users = ctx.ensure_users()
+        if name not in users:
+            raise HTTPException(404, "účet nenalezen")
+        ctx.posun_epochu(users, name)
+        ctx._users_save(users)
+        provozni_log("účet %s odhlášen ze všech zařízení" % name)
+        return {"ok": True}
+
+    @router.delete("/api/users/{name}")
+    def api_user_delete(request: Request, name: str, potvrdit: str = ""):
+        """Smaže účet i s jeho daty; chce jméno účtu jako potvrzení."""
+        kdo = is_admin(request)
+        if name == kdo:
+            raise HTTPException(422, "sám sobě se nedáš smazat")
+        users = ctx.ensure_users()
+        if name not in users:
+            raise HTTPException(404, "účet nenalezen")
+        if (potvrdit or "").strip().lower() != name.lower():
+            raise HTTPException(422, "pro smazání napiš jméno účtu %s" % name)
+        del users[name]
+        ctx._users_save(users)
+        with ctx.db() as c:
+            for tabulka, sloupec in (("attempts", "user"), ("skills", "user"), ("srs", "user"),
+                                     ("plan", "user"), ("settings", "user"), ("feedback", "user"),
+                                     ("dropped", "user"), ("class_students", "student")):
+                c.execute(f"DELETE FROM {tabulka} WHERE {sloupec} = ?", (name,))
+            c.execute("DELETE FROM classes WHERE teacher = ?", (name,))
+        provozni_log("účet %s smazán %s" % (name, kdo))
+        return {"ok": True, "user": name}
 
     # ------------------------------------------------------ provoz (admin)
     @router.post("/api/admin/backup")
@@ -596,16 +669,22 @@ def register(app: APIRouter, ctx) -> None:
             "lesson_current": ctx.syllabus.current_lesson(),
             "backups": ctx.backup_status(),
             "version": ctx.VERSION,
-            # aby bylo vidět, jest se přihlašuje přes bránu, nebo jen heslem
+            # aby bylo vidět, zda se chodí přes bránu, nebo jen s heslem
             "sso": _prihlaseni_pro_ui(),
-            # co je zrovna nasazený model — uživatel sieho nevolí
+            # co je zrovna nasazený model — uživatel si ho nevolí
             "ai": _ai_pro_ui(),
+            # limity pískoviště, aby bylo vidět, co kód smí
+            "sandbox": await _limity_piskoviste(),
+            # chybějící nebo osiřelé datové soubory
+            "data": _kontrola_dat(c),
+            # brzdění přihlašování po špatných pokusech
+            "prihlasovani_zaraza": ctx.prihlaseni_stav(),
         }
 
     # -------------------------------------------------------------- třídy
     @router.get("/api/classes")
     def api_classes(request: Request):
-        """Tridy, ktere vedi ten kdo; spratce vidí všechny."""
+        """Třídy, které vidí přihlášený; správce vidí všechny."""
         kdo, role = staff(request)
         with ctx.db() as c:
             vsecny = store.classes(c)
@@ -659,6 +738,56 @@ def register(app: APIRouter, ctx) -> None:
         provozni_log("třída %s (%s) uložena %s, žáků %d" % (identification, name, kdo, len(zaci)))
         return {"ok": True, "trida": trida}
 
+    @router.get("/api/classes/{identification}/export")
+    def api_class_export(request: Request, identification: str, days: int = 90):
+        """Výsledky třídy do CSV — každý žák a jeho hotové úlohy za období."""
+        kdo, role = staff(request)
+        with ctx.db() as c:
+            trida = next((k for k in store.classes(c) if k["id"] == identification), None)
+            if not trida:
+                raise HTTPException(404, "taková třída není")
+            if role != "admin" and trida["teacher"] != kdo:
+                raise HTTPException(403, "tuhle třídu nevedeš")
+            od = time.time() - max(1, min(int(days), 365)) * 86400
+            radky = [dict(r) for r in c.execute(
+                """SELECT cs.student,
+                          COUNT(a.id)                                                   jako_pokusu,
+                          COALESCE(SUM(a.ok), 0)                                        jako_uspechu,
+                          COUNT(DISTINCT CASE WHEN a.ok = 1 THEN a.task END)            jako_uloh,
+                          COALESCE(SUM(a.ms), 0) / 60000.0                              jako_minut,
+                          MAX(a.ts)                                                     jako_posledni
+                     FROM class_students cs
+                     LEFT JOIN attempts a ON a.user = cs.student AND a.ts > ?
+                    WHERE cs.class = ?
+                    GROUP BY cs.student ORDER BY cs.student""", (od, identification))]
+            hotove = {r["id"]: r for r in c.execute(
+                "SELECT id, title, lesson FROM tasks WHERE status = 'approved'")}
+        detail = []
+        with ctx.db() as c:
+            for r in radky:
+                detail.append(c.execute(
+                    "SELECT task FROM attempts WHERE user=? AND ok=1 AND ts>?",
+                    (r["student"], od)).fetchall())
+
+        def esc(h):
+            text = str(h if h is not None else "")
+            return '"' + text.replace('"', '""').replace("\n", " ") + '"'
+
+        hlavicky = ["zak", "pokusy", "uspechy", "uloh_spolu", "minuty", "naposledy", "ulohy"]
+        csv = [";".join(hlavicky)]
+        for r, detaily in zip(radky, detail):
+            posledni = r["jako_posledni"]
+            csv.append(";".join([
+                esc(r["student"]), esc(r["jako_pokusu"]), esc(r["jako_uspechu"]),
+                esc(r["jako_uloh"]), esc(round(r["jako_minut"] or 0)),
+                esc(time.strftime("%Y-%m-%d", time.localtime(posledni)) if posledni else ""),
+                esc(" ".join(sorted(d["task"] for d in detaily)))]))
+        from fastapi.responses import Response      # import zde, aby se nebral ze správcovské routy
+        nazev = "".join(ch if ch.isalnum() else "-" for ch in trida["name"])[:40]
+        return Response("\n".join(csv), media_type="text/csv; charset=utf-8",
+                        headers={"content-disposition":
+                                 f'attachment; filename="trida-{nazev}-{ctx.today()}.csv"'})
+
     @router.delete("/api/classes/{identification}")
     def api_class_delete(request: Request, identification: str):
         kdo, role = staff(request)
@@ -671,6 +800,35 @@ def register(app: APIRouter, ctx) -> None:
             store.drop_class(c, identification)
         provozni_log("třída %s smazána %s" % (identification, kdo))
         return {"ok": True}
+
+    async def _limity_piskoviste() -> dict:
+        """Runner ke svym omezim pripojí — aplikace si je jen precte."""
+        global _SANDBOX_CACHE
+        if time.time() - _SANDBOX_CACHE[0] < 300:
+            return _SANDBOX_CACHE[1]
+        info = {"dostupne": False}
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as klient:
+                r = await klient.get(ctx.RUNNER.rstrip("/") + "/limits")
+                if r.status_code == 200:
+                    info = {**r.json(), "dostupne": True}
+        except Exception as vyjimka:                      # noqa: BLE001
+            info = {"dostupne": False, "duvod": vyjimka.__class__.__name__}
+        _SANDBOX_CACHE = (time.time(), info)
+        return info
+
+    def _kontrola_dat(c) -> dict:
+        """Úloha odkazuje na soubor, nebo soubor nikdo nepoužívá? Obojí je chyba."""
+        from pathlib import Path as _P
+        adresar = _P(_ADRESAR_DAT)
+        soubory = {p.name for p in adresar.glob("*") if p.is_file()}
+        pouzivane: dict[str, list[str]] = {}
+        for r in c.execute("SELECT id, dataset FROM tasks WHERE dataset IS NOT NULL AND dataset != ''"):
+            pouzivane.setdefault(r["dataset"], []).append(r["id"])
+        chybi = [{"soubor": s, "ulohy": sorted(idy)[:6]} for s, idy in sorted(pouzivane.items())
+                 if s not in soubory]
+        osirele = sorted(soubory - set(pouzivane))
+        return {"chybi": chybi, "osirele": osirele[:20], "souboru": len(soubory)}
 
     @router.get("/api/admin/datasets")
     def api_datasets_seznam(request: Request):

@@ -12,6 +12,7 @@ import re
 import secrets
 import sys
 import sqlite3
+import threading
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -25,7 +26,7 @@ from pydantic import BaseModel
 from app import accounts, config as instance, adaptive, ai, store, syllabus
 
 WEB = Path(os.environ.get("RPRAXE_WEB", "/srv/web"))
-USERS_FILE = Path(os.environ.get("RPRAXE_USERS", "/data/state/users.json"))
+USERS_FILE = accounts.soubor_uctu()
 SECRET_FILE = Path(os.environ.get("RPRAXE_SECRET", "/data/state/secret.key"))
 RUNNER = os.environ.get("RPRAXE_RUNNER", "http://rpraxe-runner:8081")
 USER = os.environ.get("RPRAXE_USER", "lenka")
@@ -55,33 +56,67 @@ def check_pw(pw: str, stored: str) -> bool:
 
 def ensure_users() -> dict:
     users = accounts.load(USERS_FILE)
-    changed = False
-    generated = accounts.seed_from_env(users)
-    for name in generated:
+    ulozit = not USERS_FILE.exists()
+    vygenerovane, doplnene = accounts.seed_from_env(users)
+    for name in vygenerovane:
         print(f"[rpraxe] účet {name}: heslo vygenerováno do {USERS_FILE} (klíč first_pw), "
               f"nebo nastav {('RPRAXE_PASS_' + name.upper())}", flush=True)
-    if changed or not USERS_FILE.exists():
+    if doplnene:
+        print("[rpraxe] heslo z nastavení dosazeno za: " + ", ".join(doplnene), flush=True)
+        ulozit = True
+    if any(not rec.get("created") for rec in users.values()):
+        now = time.time()
+        for rec in users.values():
+            rec.setdefault("created", now)
+        ulozit = True
+    if ulozit:
         accounts.save(USERS_FILE, users)
     return users
 
 
 def make_token(user: str) -> str:
+    """Prihlasecka mirenka s epochou — zmena epoche zahodi vsechny starsi sedeni."""
     exp = int(time.time()) + 30 * 86400
-    payload = f"{user}.{exp}"
+    payload = f"{user}.{exp}.{epoch_uctu(user)}"
     sig = hmac.new(secret(), payload.encode(), hashlib.sha256).hexdigest()[:32]
     return f"{payload}.{sig}"
+
+
+def epoch_uctu(user: str) -> int:
+    try:
+        return int(ensure_users().get(user, {}).get("epoch") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def posun_epochu(users: dict, user: str) -> dict:
+    """Zvyší epochu účtu — všechna dosavadní přihlášení přestanou platit."""
+    try:
+        dosavadni = int(users[user].get("epoch") or 0)
+    except (KeyError, TypeError, ValueError):
+        dosavadni = 0
+    users[user] = {**users[user], "epoch": dosavadni + 1}
+    return users
 
 
 def read_token(token: str | None) -> str | None:
     if not token:
         return None
+    casti = token.split(".")
+    if len(casti) == 3:                       # sedení z éry před epochou bereme jako nula
+        user, exp, sig = casti
+        epoch = "0"
+    elif len(casti) == 4:
+        user, exp, epoch, sig = casti
+    else:
+        return None
+    payload = f"{user}.{exp}.{epoch}"
+    good = hmac.new(secret(), payload.encode(), hashlib.sha256).hexdigest()[:32]
     try:
-        user, exp, sig = token.split(".")
+        platna = int(exp) >= time.time() and int(epoch) == epoch_uctu(user)
     except ValueError:
         return None
-    payload = f"{user}.{exp}"
-    good = hmac.new(secret(), payload.encode(), hashlib.sha256).hexdigest()[:32]
-    if not hmac.compare_digest(sig, good) or int(exp) < time.time():
+    if not hmac.compare_digest(sig, good) or not platna:
         return None
     return user
 
@@ -90,9 +125,20 @@ def current_user(request: Request) -> str | None:
     return read_token(request.cookies.get("rpraxe"))
 
 
-LOGIN_PAGE = """<!doctype html><html lang="cs"><head><meta charset="utf-8">
+LOGIN_PAGE = """<!doctype html><html lang="cs" data-theme="dark"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>přihlášení — R v ruce</title><link rel="stylesheet" href="/static/style.css"></head>
+<title>přihlášení — R v ruce</title>
+<script>
+  /* motiv dřív, než se nakreslí stránka — ať přihlašovací stránka není tmavá
+     člověku, který má světlý motiv (a naopak). Šablona se zpracovává přes
+     format(), takže všechny složené závorky MUSÍ být dvojité. */
+  try {{
+    const t = localStorage.getItem("rpraxe.theme") || "auto";
+    const dark = t === "dark" || (t === "auto" && !(window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches));
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  }} catch (e) {{ document.documentElement.dataset.theme = "dark"; }}
+</script>
+<link rel="stylesheet" href="/static/style.css"></head>
 <body class="login"><form method="post" action="/login" class="card">
 <h1>R v ruce</h1><p class="muted">Denních 15–30 minut R, přesně na míru.</p>
 <label>jméno<input name="user" autocomplete="username" value="{user}"></label>
@@ -111,13 +157,22 @@ def login_page(request: Request):
 
 
 @app.post("/login")
-def login(response: Response, user: str = Form(...), pas: str = Form("", alias="pass")):
+def login(request: Request, response: Response, user: str = Form(...), pas: str = Form("", alias="pass")):
+    jmeno = user.lower().strip()
+    zkraceno = _prihlaseni_zabrano(jmeno, _klient(request))
+    if zkraceno:
+        return HTMLResponse(LOGIN_PAGE.format(
+            user=user, err=f'<p class="err">{zkraceno}</p>', sso=sso_button()), status_code=429)
     users = ensure_users()
-    rec = users.get(user.lower().strip())
+    rec = users.get(jmeno)
     if not rec or not check_pw(pas, rec["hash"]):
+        _prihlaseni_selhalo(jmeno, _klient(request))
         return HTMLResponse(LOGIN_PAGE.format(user=user, err='<p class="err">nesedí heslo</p>',
                                               sso=sso_button()), status_code=401)
-    name = user.lower().strip()
+    name = jmeno
+    users[name] = {**rec, "last_login": time.time()}   # záznam „naposledy přihlášen“
+    _users_save(users)
+    _prihlaseni_povedlo(name, _klient(request))
     if accounts.pw_is_legacy(rec["hash"]):        # nový algoritmus, až uživatel zadá heslo
         users[name] = {**rec, "hash": hash_pw(pas)}
         _users_save(users)
@@ -312,11 +367,17 @@ def backup_status() -> dict:
             snaps.append({"name": f.name, "bytes": f.stat().st_size,
                           "mtime": f.stat().st_mtime})
     info = {}
-    if INFO_FILE.exists():
-        try:
-            info = json.loads(INFO_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            info = {}
+    for cesta in (INFO_FILE, BACKUP_DIR.parent / "zaloha.json"):
+        if cesta.exists():
+            try:
+                info = json.loads(cesta.read_text(encoding="utf-8"))
+                break
+            except (json.JSONDecodeError, OSError):
+                info = {}
+    if info.get("at"):
+        stari = (time.time() - float(info["at"])) / 3600.0
+        info["stari_h"] = round(stari, 1)
+        info["cerstva"] = stari < 30.0
     return {"local": snaps, "last": info}
 
 
@@ -345,7 +406,28 @@ def task_lessons() -> dict:
 @app.on_event("startup")
 def startup():
     store.init()
-    ensure_users()
+    presunute = accounts.presun_zbytky(USERS_FILE)
+    if presunute:
+        print(f"[rpraxe] účty přeneseny do {USERS_FILE}: {', '.join(presunute)}", flush=True)
+    if os.environ.get("RPRAXE_RESET_HESLA", "").strip():
+        with _users_lock:
+            mapa = accounts.load(USERS_FILE)
+            obnove = accounts.vynut_hesla_z_env(mapa)
+            if obnove:
+                accounts.save(USERS_FILE, mapa)
+        if obnove:
+            print("[rpraxe] RESET hesel podle nastavení: " + ", ".join(obnove)
+                  + " — teď vypni RPRAXE_RESET_HESLA", flush=True)
+    uc = ensure_users()
+    print(f"[rpraxe] účty žijí v {USERS_FILE} ({len(uc)}: {', '.join(sorted(uc))})", flush=True)
+    if uc and not any(r.get("role") == "admin" for r in uc.values()):
+        print("[rpraxe] POZOR: nikdo nemá roli admin — nastavení je nedostupné", flush=True)
+    if uc and not any(r.get("role") in ("admin", "teacher") for r in uc.values()):
+        print("[rpraxe] POZOR: žádný učitelský účet — menu Třída nikdo neuvidí", flush=True)
+    chybi = [j for j in accounts.jmena_ze_specu(os.environ.get("RPRAXE_USERS", "")) if j not in uc]
+    if chybi:
+        print("[rpraxe] POZOR: v RPRAXE_USERS je " + ", ".join(chybi)
+              + ", ale účet neexistuje (pomůže RPRAXE_USERS_FILE?)", flush=True)
     n = load_banks()
     print(f"[rpraxe] načteno {n} úloh", flush=True)
 
@@ -828,7 +910,55 @@ def api_progress(request: Request, days: int = 60):
             "SELECT id, title, lesson, level, status, source FROM tasks WHERE source='llm' ORDER BY created DESC LIMIT 20")]
     return {**st, "by_lesson": by_lesson, "weak": weak, "recent": recent, "hard": hard,
             "generated": gen, "streak": adaptive.streak(c, user), "lesson_current": syllabus.current_lesson(),
-            "cheatsheet": syllabus.CHEATSHEET, "syllabus": task_lessons()}
+            "cheatsheet": syllabus.CHEATSHEET, "syllabus": task_lessons(),
+            "tyden": tyden(c, user), "opakovani": opakovani(c, user)}
+
+
+def tyden(c: sqlite3.Connection, user: str) -> dict:
+    """Souhrn za posledních 7 dní — aby bylo vidět, jestli to vůbec jede."""
+    od = time.time() - 7 * 86400
+    celkem = c.execute("SELECT COUNT(*) n, COALESCE(SUM(ok),0) p, COALESCE(SUM(ms),0) ms, "
+                       "COUNT(DISTINCT task) uloh FROM attempts WHERE user=? AND ts>?",
+                       (user, od)).fetchone()
+    dny = [dict(r) for r in c.execute(
+        """SELECT date(ts,'unixepoch','localtime') d, COUNT(*) n, COALESCE(SUM(ok),0) p,
+                  COALESCE(SUM(ms),0)/60000.0 min
+           FROM attempts WHERE user=? AND ts>? GROUP BY d ORDER BY d""", (user, od))]
+    lepsi = [dict(r) for r in c.execute(
+        """SELECT s.key, l.label, s.theta FROM skills s
+           LEFT JOIN skill_labels l ON l.key = s.key
+           WHERE s.user = ? AND s.n >= 2 ORDER BY s.theta DESC LIMIT 3""", (user,))]
+    radost = c.execute("SELECT COUNT(*) FROM feedback WHERE user=? AND kind='note' AND ts>?",
+                       (user, od)).fetchone()[0]
+    return {"pokusy": celkem["n"] or 0, "uspechy": celkem["p"] or 0,
+            "uloh": celkem["uloh"] or 0, "minuty": round((celkem["ms"] or 0) / 60000),
+            "uspesnost": round(100.0 * (celkem["p"] or 0) / celkem["n"]) if celkem["n"] else 0,
+            "dny": dny, "lepsi": lepsi, "slabsi": _slabsi_dovednosti(c, user),
+            "poznamek": radost, "aktivni_dny": len(dny)}
+
+
+def _slabsi_dovednosti(c: sqlite3.Connection, user: str) -> list[dict]:
+    return [dict(r) for r in c.execute(
+        """SELECT s.key, COALESCE(l.label, s.key) label, s.theta FROM skills s
+           LEFT JOIN skill_labels l ON l.key = s.key
+           WHERE s.user = ? AND s.n >= 2 ORDER BY s.theta ASC LIMIT 3""", (user,))]
+
+
+def opakovani(c: sqlite3.Connection, user: str) -> dict:
+    """Co se má brzy vrátit a proč — rozvrh opakování není tajný."""
+    now = time.time()
+    dne = [dict(r) for r in c.execute(
+        """SELECT s.task, t.title, s.due, s.reps, s.lapses FROM srs s
+           LEFT JOIN tasks t ON t.id = s.task
+           WHERE s.user = ? AND s.due <= ? ORDER BY s.due LIMIT 12""", (user, now))]
+    blizko = [dict(r) for r in c.execute(
+        """SELECT s.task, t.title, s.due, s.reps, s.lapses FROM srs s
+           LEFT JOIN tasks t ON t.id = s.task
+           WHERE s.user = ? AND s.due > ? ORDER BY s.due LIMIT 12""", (user, now))]
+    for polozka in dne + blizko:
+        polozka["za_dny"] = round((polozka["due"] - now) / 86400.0, 1)
+    return {"dnes": dne, "blizko": blizko, "celkem": c.execute(
+        "SELECT COUNT(*) FROM srs WHERE user=?", (user,)).fetchone()[0]}
 
 
 @app.get("/api/cheatsheet")
@@ -1044,6 +1174,19 @@ def logout():
     return resp
 
 
+@app.post("/api/logout-all")
+def logout_all(request: Request):
+    """Odhlásí všechny relace účtu — i na zapomenutém notebooku nebo v telefonu."""
+    user = current_user(request)
+    if not user:
+        raise HTTPException(401, "nepřihlášen")
+    users = ensure_users()
+    users = posun_epochu(users, user)
+    _users_save(users)
+    print(f"[rpraxe] {datetime.now():%Y-%m-%d %H:%M} ucet {user}: odhlasen vsechna zarizeni", flush=True)
+    return {"ok": True, "msg": "odhlášeno z ostatních zařízení"}
+
+
 @app.get("/api/whoami")
 def whoami(request: Request):
     u = current_user(request)
@@ -1072,6 +1215,68 @@ def _fail_row(c: sqlite3.Connection, key: str) -> tuple[int, float]:
 
 def _users_save(users: dict) -> None:
     accounts.save(USERS_FILE, users)
+
+
+LOGIN_FAIL_MAX = 6          # špatných pokusů na jeden účet
+LOGIN_LOCK_S = 600          # pak desetiminutová pauza
+_pocitadlo_lock = threading.Lock()
+
+
+def _klient(request: Request) -> str:
+    """Klient podle hlavičky brány, jinak podle spojení; prázdné pokud nejistota."""
+    sidlo = request.headers.get("x-forwarded-for") or ""
+    return sidlo.split(",")[0].strip() or (request.client.host if request.client else "")
+
+
+def _hlidaci_klice(jmeno: str, sidlo: str) -> list[str]:
+    klice = [f"logfail:u:{jmeno}"]
+    if sidlo:
+        klice.append(f"logfail:ip:{sidlo}")
+    return klice
+
+
+def _prihlaseni_zabrano(jmeno: str, sidlo: str) -> str:
+    """Krátka hláška, proč se právě teď nesmí zkoušet; prázdné znamená 'může zkusit'."""
+    now = time.time()
+    with db() as c:
+        for klic in _hlidaci_klice(jmeno, sidlo):
+            _, until = _fail_row(c, klic)
+            if until > now:
+                return f"Příliš mnoho pokusů — zkus to znovu za {int((until - now) / 60) + 1} min."
+    return ""
+
+
+def _prihlaseni_selhalo(jmeno: str, sidlo: str) -> None:
+    now = time.time()
+    with _pocitadlo_lock, db() as c:
+        for klic in _hlidaci_klice(jmeno, sidlo):
+            fails, until = _fail_row(c, klic)
+            if until > now:                     # zamčeno → počitadlo neshazujeme
+                continue
+            fails += 1
+            zamceno = now + LOGIN_LOCK_S if fails >= LOGIN_FAIL_MAX else 0.0
+            c.execute("INSERT INTO ai_cache(key,val,ts) VALUES(?,?,?) "
+                      "ON CONFLICT(key) DO UPDATE SET val=excluded.val, ts=excluded.ts",
+                      (klic, json.dumps([fails, zamceno]), now))
+
+
+def _prihlaseni_povedlo(jmeno: str, sidlo: str) -> None:
+    with db() as c:
+        for klic in _hlidaci_klice(jmeno, sidlo):
+            c.execute("DELETE FROM ai_cache WHERE key=?", (klic,))
+
+
+def prihlaseni_stav() -> dict:
+    """Kolika účtům právě brání brzda — aby to správce viděl v provozu."""
+    now = time.time()
+    zamcene = []
+    with db() as c:
+        for row in c.execute("SELECT key, val FROM ai_cache WHERE key LIKE 'logfail:u:%'"):
+            _, _, jmeno = row["key"].partition(":")
+            fails, until = _fail_row(c, row["key"])
+            if until > now:
+                zamcene.append({"ucet": jmeno, "do": int(until - now)})
+    return {"zamcene": zamcene, "limit": LOGIN_FAIL_MAX, "pauza_s": LOGIN_LOCK_S}
 
 
 class PasswordBody(BaseModel):

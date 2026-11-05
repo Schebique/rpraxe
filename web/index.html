@@ -38,6 +38,8 @@
         <div class="menu" id="usermenu" hidden>
           <button id="btn-settings" type="button">Nastavení</button>
           <button id="btn-pass" type="button">Změnit heslo</button>
+          <button id="btn-logout-all" type="button" title="odhlásí všude kromě tohohle prohlížeče">
+            odhlásit ostatní zařízení</button>
         </div>
       </div>
       <span id="streak" title="za sebou dní s alespoň jednou vyplněnou úlohou"></span>
@@ -146,6 +148,10 @@
           <div class="tiny muted" id="spark-lbl"></div></div>
         <div class="card"><h3>Dovednosti (odhad úrovně)</h3><div id="skillbars"></div>
           <div class="tiny muted" id="skill-lbl"></div></div>
+        <div class="card"><h3>Tyden</h3><div id="tyden"></div></div>
+        <div class="card"><h3>Co se vrací</h3><div id="opakovani"></div>
+          <p class="tiny muted">Systém si pamatuje, co jsi měl obtížné, a po čase to vrátí
+            zpřehledně. Číslo je, za kolik dní se úloha ukáže znovu.</p></div>
         <div class="card"><h3>Kde se to zadrhává</h3><div id="hard"></div></div>
         <div class="card"><h3>Tvoje poznámky</h3><div id="mynotes"></div>
           <p class="tiny muted">Poznámku píšeš u úlohy tlačítkem „zapsat poznámku“. Uloží se k ní
@@ -180,7 +186,16 @@
       </div>
       <div class="card" style="margin-top:14px"><h3>Žáci</h3>
         <div style="overflow:auto"><table id="class"></table></div>
-        <p class="tiny muted">Údaje jsou z tvého serveru; studenti je vidí taky, navzájem ne.</p></div>
+        <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">
+          <button id="tc-export" class="ghost" type="button">exportovat výsledky třídy (CSV)</button>
+          <select id="tc-export-days" style="width:auto">
+            <option value="30">posledních 30 dní</option><option value="90" selected>posledních 90 dní</option>
+            <option value="365">celý rok</option>
+          </select>
+          <span class="tiny muted" id="tc-export-lbl"></span>
+        </div>
+        <p class="tiny muted">Údaje jsou z tvého serveru; studenti je vidí taky, navzájem ne.
+          Export je jen pro třídu, kterou vedeš.</p></div>
       <div class="card" style="margin-top:14px" id="studentdetail"></div>
       <div class="card" style="margin-top:14px">
         <h3>Vlastní úlohy</h3>
@@ -222,6 +237,7 @@
             snímky tady jsou ruční a dají se načíst zpátky.</p></div>
         <div class="card"><h3>Přihlašování</h3><div id="adm-login"></div></div>
         <div class="card"><h3>AI</h3><div id="adm-ai"></div></div>
+        <div class="card"><h3>Provoz</h3><div id="adm-provoz"></div></div>
         <div class="card"><h3>Banka úloh</h3><div id="adm-bank"></div></div>
       </div>
     </section>

@@ -413,9 +413,51 @@ async function loadProg() {
     (p.recent || []).map(a => `<tr><td class="tiny muted">${new Date(a.ts * 1000).toLocaleString("cs-CZ")}</td>
       <td>${esc(a.title)}</td><td>${a.ok ? '<span class="ok">✓</span>' : '<span class="err">✗</span>'}</td>
       <td>${a.hints || 0}</td></tr>`).join("");
+  vykresliTyden(p.tyden);
+  vykresliOpakovani(p.opakovani);
   loadTahak();
   nactiPoznamky().then(vykresliSeznamPoznamek);
   $$("#hard a").forEach(a => a.onclick = e => { e.preventDefault(); openTask(a.dataset.id); show("today"); });
+}
+
+/** Týdenní souhrn — aby student poznal, jestli ten týden vůbec něco byl. */
+function vykresliTyden(tyden) {
+  const box = $("#tyden");
+  if (!box) return;
+  const d = tyden || {};
+  if (!d.pokusy) {
+    box.innerHTML = `<p class="muted tiny">Tenhle týden zatím žádné pokusy.
+      Stačí jedna úloha a denní řada se rozjíždí.</p>`;
+    return;
+  }
+  const slabsi = (d.slabsi || []).map(s => esc(s.label)).join(", ");
+  box.innerHTML = `<div class="row" style="gap:14px;flex-wrap:wrap">
+      <div><div class="kpi">${d.pokusy}</div><div class="tiny muted">pokusů</div></div>
+      <div><div class="kpi">${d.uspesnost} %</div><div class="tiny muted">úspěšných</div></div>
+      <div><div class="kpi">${d.minuty}</div><div class="tiny muted">minut</div></div>
+      <div><div class="kpi">${d.aktivni_dny}/7</div><div class="tiny muted">dnů s cvičením</div></div>
+    </div>
+    <p class="tiny muted" style="margin-top:8px">${d.uloh} různých úloh ·
+      ${d.poznamek ? d.poznamek + " poznámek" : "bez poznámek"}</p>
+    ${slabsi ? `<p class="tiny">Slabší místa: ${slabsi}</p>` : ""}`;
+}
+
+/** Rozvrh opakování: co je dnes a co se chystá. */
+function vykresliOpakovani(opakovani) {
+  const box = $("#opakovani");
+  if (!box) return;
+  const d = opakovani || {};
+  const radek = (x, retezec) => `<li><a href="#" data-id="${esc(x.task)}">${esc(x.title || x.task)}</a>
+    <span class="tiny muted">${retezec}</span>${x.lapses ? ` <span class="pill">${x.lapses}× těžké</span>` : ""}</li>`;
+  const dnes = (d.dnes || []).map(x => radek(x, "dnes")).join("");
+  const blizko = (d.blizko || []).slice(0, 6)
+    .map(x => radek(x, x.za_dny <= 1 ? "zítra" : `za ${Math.round(x.za_dny)} dní`)).join("");
+  box.innerHTML = `${dnes ? `<strong class="tiny">Dnes</strong><ul class="tiny">${dnes}</ul>` : ""}
+    ${blizko ? `<strong class="tiny">Brzy</strong><ul class="tiny">${blizko}</ul>`
+             : '<p class="tiny muted">Nic dalšího nenasbíraného — opakování se naplní z procvičovaných úloh.</p>'}`;
+  $$("#opakovani a").forEach(a => a.onclick = e => {
+    e.preventDefault(); openTask(a.dataset.id); show("today");
+  });
 }
 
 /* ------------------------------------------------------- Nápověda (Help) */
@@ -1093,6 +1135,38 @@ function smazTridu(id) {
 }
 
 /* ---------------------------------------------- správa: zálohy a obnova */
+/** Co dělá pískoviště, data a přihlašovací brzda — vše na jednom místě. */
+function renderProvoz(s) {
+  const box = $("#adm-provoz");
+  if (!box) return;
+  const sandbox = s.sandbox || {};
+  const data = s.data || {};
+  const zaraza = s.prihlasovani_zaraza || {};
+  const uklid = (data.osirele || []).length || (data.chybi || []).length;
+  box.innerHTML = `
+    <div class="row" style="gap:14px;flex-wrap:wrap">
+      <div><div class="muted tiny">pískoviště</div><div class="tiny">
+        ${sandbox.dostupne
+          ? `CPU ${sandbox.cpu_s} s · zeď ${sandbox.stena_s} s · RAM ${sandbox.ram_mb} MB ·
+             bez sítě · work ${sandbox.pracovni_mb} MB`
+          : `nedostupné (${esc(sandbox.duvod || "runner neodpovídá")})`}</div></div>
+      <div><div class="muted tiny">data</div><div class="tiny">
+        ${data.souboru || 0} souborů${uklid ? ` · ${esc(t("úklid"))}: ${
+            (data.chybi || []).length} chybí, ${(data.osirele || []).length} osiřelých`
+          : ` · ${esc(t("v pořádku"))}`}</div></div>
+      <div><div class="muted tiny">přihlašovací brzda</div><div class="tiny">
+        ${(zaraza.zamcene || []).length
+          ? `zadržené účty: ${(zaraza.zamcene || []).map(z => `${esc(z.ucet)} (${Math.round(z.do / 60)} min)`).join(", ")}`
+          : `nikdo zadržený · ${zaraza.limit || "?"} pokusů, pak ${Math.round((zaraza.pauza_s || 0) / 60)} min pauza`}</div></div>
+    </div>
+    ${(data.chybi || []).length ? `<p class="tiny err">Úloha odkazuje na soubor, který v bance dat není:
+      ${data.chybi.map(x => `${esc(x.soubor)} (${esc(x.ulohy.join(", "))})`).join("; ")}</p>` : ""}
+    ${(data.osirele || []).length ? `<p class="tiny muted">Soubory, které žádná úloha nepoužívá:
+      ${esc((data.osirele || []).join(", "))}</p>` : ""}
+    <p class="tiny muted">Limity nastavuje <code>docker-compose.yml</code>
+      (<code>RPRAXE_CPU_LIMIT</code>, <code>RPRAXE_WALL_LIMIT</code>, <code>RPRAXE_MEM_MB</code>).</p>`;
+}
+
 async function renderBackupCard() {
   const box = $("#adm-backups");
   if (!box) return;
@@ -1100,9 +1174,19 @@ async function renderBackupCard() {
   try { data = await api("/api/admin/backups"); } catch (e) { box.innerHTML = `<p class="err">${esc(t("není spojení"))}</p>`; return; }
   const bk = data.prehled || {};
   const snimky = data.snimky || [];
+  const last = bk.last || {};
+  const co = [last.ucty && t("účty"), last.data && t("datasety"), last.banka && t("banka úloh")]
+    .filter(Boolean).join(", ");
   box.innerHTML = `<p class="tiny muted">${esc(t("Poslední noční záloha"))}: ${
-      bk.last && bk.last.at ? new Date(bk.last.at * 1000).toLocaleString("cs-CZ") + " → " + esc(bk.last.dest || "NAS")
+      last.at ? new Date(last.at * 1000).toLocaleString("cs-CZ")
+        + ` <span class="tiny ${last.cerstva ? "ok" : "err"}">(${
+            last.stari_h ?? "?"} ${esc(t("hod"))})</span>`
+        + (co ? ` — ${esc(co)}` : "")
         : esc(t("zatím žádná"))}</p>
+    ${last.at && !last.cerstva
+      ? `<p class="tiny err">${esc(t("Záloha je starší než den — zkontroluj plánovaný úkol."))}</p>` : ""}
+    ${!last.at ? `<p class="tiny muted">${esc(
+        t("Zatím nebyla žádná noční záloha — spusť scripts/backup.sh nebo ji nastav v cronu."))}</p>` : ""}
     <div style="overflow:auto"><table id="bk-table">
       <tr><th>${esc(t("soubor"))}</th><th>${esc(t("pokusy"))}</th><th>${esc(t("náš"))}</th><th></th></tr>
       ${snimky.map(s => `<tr><td class="tiny">${esc(s.jmeno)}<div class="tiny muted">${
@@ -1252,8 +1336,9 @@ async function openSettings() {
     if (!items.some(([v]) => String(v) === String(currentVal))) sel.value = items[0][0];
   };
   fill($("#set-theme"), [["auto", t("Systémový")], ["dark", t("Tmavý")], ["light", t("Světlý")]], s.theme || "auto");
-  const langs = Object.entries(s.langs || { cs: "čeština" });
-  fill($("#set-lang"), langs, s.lang || "cs");
+  // jen jazyky, které mají hotový překlad — jinak by se nabídla poloviština
+  const langs = jazykySPrekladem(Object.entries(s.langs || { cs: "čeština" }));
+  fill($("#set-lang"), langs, langs.some(([kod]) => kod === (s.lang || "cs")) ? (s.lang || "cs") : "cs");
   fill($("#set-min"), (s.budgets || [15, 20, 30, 45]).map(m => [m, `${m} min`]), s.minutes || 20);
   const ai = s.ai || {};
   $("#set-model-info").textContent = ai.model
@@ -1590,7 +1675,11 @@ async function showStudent(user) {
   box.innerHTML = '<p class="muted tiny">načítám…</p>';
   const p = await api("/api/class/" + encodeURIComponent(user));
   const doved = (p.skills || []).map(s => `<span class="pill">${esc(s.label)} ${Number(s.theta).toFixed(1)}</span>`).join(" ");
-  box.innerHTML = `<h3>${esc(user)}</h3>
+  const sk = p.skoly || {};
+  const dluh = (sk.nacteno || 0) > 0 && (sk.hotovo || 0) < (sk.nacteno || 0)
+    ? `<span class="pill hot">dnes ${sk.hotovo}/${sk.nacteno}</span>`
+    : (sk.nacteno ? `<span class="pill">dnes hotovo ${sk.hotovo}/${sk.nacteno}</span>` : "");
+  box.innerHTML = `<h3>${esc(user)} ${dluh}</h3>
     <p class="tiny muted">${p.total || 0} pokusů · ${p.passed || 0} správně ·
       ${p.first_try_rate ?? 0} % na první dobrou · ${p.days_active || 0} dní ·
       ${Math.round(p.minutes_total || 0)} min</p>
@@ -1599,6 +1688,31 @@ async function showStudent(user) {
   $("#stud-recent").innerHTML = "<tr><th>kdy</th><th>úloha</th><th></th></tr>" + (p.recent || []).map(a =>
     `<tr><td class="tiny muted">${new Date(a.ts * 1000).toLocaleString("cs-CZ")}</td>
      <td>${esc(a.title || a.task)}</td><td>${a.ok ? "✓" : "✗"}</td></tr>`).join("");
+  const poznamky = p.poznamky || [];
+  box.insertAdjacentHTML("beforeend", `
+    <h3 style="margin-top:14px">Poznámky žáka</h3>
+    ${poznamky.length ? `<div style="overflow:auto"><table id="stud-poznamky"></table></div>
+      <p class="tiny muted">Poznámku píše žák sám k úloze. Vidíš ji, abys poznal, kde to vázne —
+        žák ji ale myslel jako svou poznámku, ne jako zprávu tobě.</p>`
+      : '<p class="tiny muted">Žák zatím napsal žádné poznámky.</p>'}`);
+  if (poznamky.length) {
+    $("#stud-poznamky").innerHTML = "<tr><th>kdy</th><th>úloha</th><th>co napsal</th></tr>" +
+      poznamky.map(x => `<tr><td class="tiny muted">${new Date(x.ts * 1000).toLocaleDateString("cs-CZ")}</td>
+        <td class="tiny">${esc(x.titulek || x.task)}</td>
+        <td class="tiny" style="white-space:pre-wrap">${esc(x.text)}</td></tr>`).join("");
+  }
+}
+
+/** Stáhne CSV s výsledky vybrané třídy. */
+function exportTridy() {
+  const oznaceni = $("#tc-export-lbl");
+  if (!TRIDA_VYBRANA) {
+    if (oznaceni) oznaceni.textContent = "dřív klikni na třídu, kterou chceš exportovat";
+    return;
+  }
+  const dni = ($("#tc-export-days") || {}).value || "90";
+  window.location = `/api/classes/${encodeURIComponent(TRIDA_VYBRANA)}/export?days=${dni}`;
+  if (oznaceni) oznaceni.textContent = "sestavuje se soubor…";
 }
 
 /** Otevře dialog s úlohou — prázdný argument znamená úplně vlastní úloha. */
@@ -1717,12 +1831,34 @@ async function loadAdmin() {
       <div class="kpi">${v}</div><div class="tiny muted">${esc(p)}</div></div>`).join("");
 
   const u = await api("/api/users");
-  $("#adm-users").innerHTML = "<tr><th>jméno</th><th>role</th><th>heslo</th><th></th></tr>" +
+  const prihlasen = (cas) => cas ? new Date(cas * 1000).toLocaleDateString("cs-CZ") : "ještě nic";
+  $("#adm-users").innerHTML = "<tr><th>jméno</th><th>role</th><th>heslo</th><th>naposledy</th><th></th></tr>" +
     u.users.map(x => `<tr><td>${esc(x.user)}</td>
       <td><select data-user="${esc(x.user)}" class="rolepick">${u.roles.map(r =>
         `<option ${r === x.role ? "selected" : ""}>${r}</option>`).join("")}</select></td>
       <td>${x.generated_pw ? '<span class="pill">vygenerované</span>' : (x.changed ? "vlastní" : "výchozí")}</td>
-      <td><button class="ghost" data-newpw="${esc(x.user)}">nové heslo</button></td></tr>`).join("");
+      <td class="tiny muted">${prihlasen(x.prihlasen)}</td>
+      <td class="row" style="gap:4px;flex-wrap:nowrap">
+        <button class="ghost" data-newpw="${esc(x.user)}">nové heslo</button>
+        <button class="ghost" data-logout="${esc(x.user)}" title="odhlásit všechny relace">odhlásit</button>
+        <button class="ghost" data-smaz="${esc(x.user)}" title="smazat účet i s daty">smazat</button>
+      </td></tr>`).join("");
+  $$("#adm-users [data-logout]").forEach(b => b.onclick = () => {
+    potvrd(`odhlásit účet ${b.dataset.logout} ve všech prohlížečích?`, async () => {
+      await api(`/api/users/${encodeURIComponent(b.dataset.logout)}/logout`, { method: "POST", body: "{}" });
+      toast("účet odhlášen ze všech zařízení");
+    }, "odhlásit");
+  });
+  $$("#adm-users [data-smaz]").forEach(b => b.onclick = () => {
+    ptat(`Smazání účtu je nevratné — napiš jméno účtu ${b.dataset.smaz}, pokud na to máš.`,
+         b.dataset.smaz, "text", false).then(hodnota => {
+      if (!hodnota) return;
+      api(`/api/users/${encodeURIComponent(b.dataset.smaz)}?potvrdit=${encodeURIComponent(hodnota)}`,
+          { method: "DELETE" })
+        .then(() => { toast("účet smazán"); loadAdmin(); })
+        .catch(e => toast(String(e.message || e)));
+    });
+  });
   $$("#adm-users .rolepick").forEach(sel => sel.onchange = async () => {
     await api(`/api/users/${sel.dataset.user}/role`, { method: "POST",
       body: JSON.stringify({ user: sel.dataset.user, role: sel.value }) });
@@ -1732,6 +1868,8 @@ async function loadAdmin() {
   $("#nu-role").innerHTML = u.roles.map(r => `<option>${r}</option>`).join("");
 
   renderBackupCard();
+
+  renderProvoz(s);
 
   renderLoginCard();
 
@@ -1916,6 +2054,16 @@ window.addEventListener("DOMContentLoaded", () => {
     $("#btn-user").setAttribute("aria-expanded", String(open));
   };
   $("#btn-pass").onclick = openPassword;
+  const odhlasVse = $("#btn-logout-all");
+  if (odhlasVse) odhlasVse.onclick = () => {
+    closeUserMenu();
+    potvrd("odhlásit tohle konto ve všech ostatních prohlížečích?", async () => {
+      await api("/api/logout-all", { method: "POST", body: "{}" });
+      toast("ostatní zařízení jsou odhlášená");
+    }, "odhlásit");
+  };
+  const exportTridyTlacitko = $("#tc-export");
+  if (exportTridyTlacitko) exportTridyTlacitko.onclick = exportTridy;
   $("#pw-cancel").onclick = closePassword;
   $("#pw-save").onclick = submitPassword;
   $("#pwmodal").onclick = (e) => { if (e.target.id === "pwmodal") closePassword(); };
