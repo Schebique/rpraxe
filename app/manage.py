@@ -9,6 +9,7 @@ Role
   admin    – plus účty, model, zálohy, promazání historie
 """
 from __future__ import annotations
+import unicodedata
 
 import csv
 import httpx
@@ -783,7 +784,9 @@ def register(app: APIRouter, ctx) -> None:
                 esc(time.strftime("%Y-%m-%d", time.localtime(posledni)) if posledni else ""),
                 esc(" ".join(sorted(d["task"] for d in detaily)))]))
         from fastapi.responses import Response      # import zde, aby se nebral ze správcovské routy
-        nazev = "".join(ch if ch.isalnum() else "-" for ch in trida["name"])[:40]
+        # název souboru musí zůstat v ASCII hlavičce — třídy mají jména s háčky
+        nazev = unicodedata.normalize("NFKD", trida["name"]).encode("ascii", "ignore").decode("ascii")
+        nazev = "".join(ch if ch.isalnum() else "-" for ch in nazev)[:40]
         return Response("\n".join(csv), media_type="text/csv; charset=utf-8",
                         headers={"content-disposition":
                                  f'attachment; filename="trida-{nazev}-{ctx.today()}.csv"'})
