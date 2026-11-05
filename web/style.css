@@ -1,6 +1,7 @@
 :root{
   --bg:#0f1115; --bg2:#161a22; --bg3:#1d2330; --line:#28303f;
   --fg:#e8ebf1; --muted:#93a0b5; --dim:#828fa4;
+  --editor-cislo:#8b98ad;   /* čísla řádků v editoru — na podkladu editoru */
   --ok:#3ddc97; --bad:#ff6b6b; --warn:#ffb454; --accent:#7aa2ff; --accent2:#b48cff;
   --mono:'JetBrains Mono','Fira Code',Consolas,'Liberation Mono',monospace;
   --code:#11151d; --hover:#232b3b; --scrim:rgba(4,7,12,.68); --shadow:rgba(0,0,0,.45);
@@ -12,6 +13,7 @@
 html[data-theme="light"]{
   --bg:#f4f6fa; --bg2:#ffffff; --bg3:#eef1f7; --line:#d5dbe6;
   --fg:#1a2130; --muted:#55637a; --dim:#646f80;
+  --editor-cislo:#55637a;
   --ok:#0a7d44; --bad:#c62828; --warn:#8f5600; --accent:#2f5fd0; --accent2:#6b46c1;
   --code:#eef1f7; --hover:#e4e9f3; --scrim:rgba(30,40,60,.35); --shadow:rgba(20,30,50,.14);
   --console:#f6f8fc; --coach:#eaf0fb; --taskon:#e2e9f7; --zebra:#f1f4fa; --glow:#dde6f6;
@@ -238,7 +240,10 @@ details.rada[open]>summary::before{content:"▾ "}
    obdoby těch samých rolí. */
 html[data-theme="light"] .cm-s-material-darker.CodeMirror{background:#fff;color:#1a2130}
 html[data-theme="light"] .cm-s-material-darker .CodeMirror-gutters{background:#f4f6fa;color:#5c6a80;border-right:1px solid var(--line)}
-html[data-theme="light"] .cm-s-material-darker .CodeMirror-linenumber{color:var(--dim)}
+/* Čísla řádků: vendor styl je má #999 a editor se jmenuje různě
+ * (material-darker i default), proto se barva určuje pro obě varianty. */
+.CodeMirror-linenumber,
+.cm-s-material-darker .CodeMirror-linenumber{color:var(--editor-cislo)}
 html[data-theme="light"] .cm-s-material-darker .CodeMirror-cursor{border-left:1px solid #1a2130}
 html[data-theme="light"] .cm-s-material-darker .CodeMirror-selected,
 html[data-theme="light"] .cm-s-material-darker.CodeMirror-focused .CodeMirror-selected{background:#d9e4fb}

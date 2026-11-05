@@ -264,6 +264,30 @@ def health():
             "datasets": sorted(p.name for p in DATASETS.glob("*") if p.is_file())[:60]}
 
 
+@app.get("/limits")
+def limits():
+    """Co běžícímu kódu dovolujeme — ať to vidí uživatel i správce.
+
+    Hodnoty se ve výchozím nastavení vztahují ke každému běhu zvlášť (limit se
+    nasazuje v child procesu při startu, ne v serveru), proto se vypisují
+    nastavené meze, ne to, co právě naměříme v tomto procesu.
+    """
+    def _real(ktera, nastaveno):
+        try:
+            hodnota = resource.getrlimit(ktera)[0]
+        except (OSError, ValueError):
+            return nastaveno
+        return nastaveno if hodnota in (0, resource.RLIM_INFINITY) else hodnota
+    return {"dostupne": True,
+            "cpu_s": _real(resource.RLIMIT_CPU, CPU_LIMIT),
+            "ram_mb": _real(resource.RLIMIT_AS, MEM_MB * 1024 * 1024) // (1024 * 1024),
+            "soubor_mb": _real(resource.RLIMIT_FSIZE, 20 * 1024 * 1024) // (1024 * 1024),
+            "procesu": _real(resource.RLIMIT_NPROC, 96),
+            "stena_s": WALL_LIMIT,
+            "bez_site": True,
+            "uid": SANDBOX_UID}
+
+
 @app.post("/run")
 def run(req: RunReq) -> dict:
     t0 = time.time()

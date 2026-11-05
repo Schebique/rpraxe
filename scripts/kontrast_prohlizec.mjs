@@ -69,12 +69,20 @@ const browser = await puppeteer.launch({ executablePath: najdiChrom(), args: ['-
 const stranka = await browser.newPage();
 await stranka.setViewport({ width: 1440, height: 900 });
 
+// motiv se musí zapsat do prohlížeče před načtením stránky — aplikace si ho
+// čte při startu. Kdyby se přepínal až uprostřed běžné stránky, měřili bychom
+// dvakrát tentýž motiv.
+async function nastavMotiv(motiv) {
+  await stranka.goto(ZAKLAD + '/', { waitUntil: 'domcontentloaded' });
+  await stranka.evaluate((m) => { try { localStorage.setItem('rpraxe.tema', m); } catch (e) {} }, motiv);
+}
+
 if (JMENO) {
   // přihlásíme se z Node, ať vidíme hlavičku se sušenkou — prohlížeč ji JavaScriptu neukáže
-  const odpoved = await fetch(ZAKLAD + '/api/prihlaseni', {
+  const odpoved = await fetch(ZAKLAD + '/login', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jmeno: JMENO, heslo: HESLO, prihlaska: JMENO }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ user: JMENO, pass: HESLO }),
     redirect: 'manual',
   });
   const suenka = (odpoved.headers.get('set-cookie') || '').split(';')[0];
@@ -85,17 +93,18 @@ if (JMENO) {
 
 let nalezy = 0;
 for (const motiv of ['light', 'dark']) {
+  await nastavMotiv(motiv);
   for (const [nazev, volba] of OBRAZOVKY) {
     await stranka.goto(ZAKLAD + '/?', { waitUntil: 'domcontentloaded' });
     await stranka.evaluate((m, selektor) => {
       document.documentElement.dataset.theme = m;
-      try { localStorage.setItem('rpraxe.tema', m); } catch (e) {}
       const tlacitko = document.querySelector(selektor);
       if (tlacitko) { tlacitko.hidden = false; tlacitko.click(); }
     }, motiv, volba);
     await new Promise((r) => setTimeout(r, 1100));
     const vysledek = await stranka.evaluate((prah, prahVelky) => {
       const najite = [];
+      let merit = 0;
       const zaklad = { r: 255, g: 255, b: 255, a: 1 };
       function rozloz(p) { const s = String(p).match(/rgba?\(([^)]+)\)/); if (!s) return null; const [r, g, b, a] = s[1].split(',').map(parseFloat); return { r, g, b, a: a === undefined ? 1 : a }; }
       function pozadiPro(el) {
@@ -119,6 +128,7 @@ for (const motiv of ['light', 'dark']) {
         if (!text) continue;
         const styl = getComputedStyle(el);
         if (styl.visibility === 'hidden' || Number(styl.opacity) < 0.35) continue;
+        merit += 1;
         const font = parseFloat(styl.fontSize) || 16;
         const tuC = (parseFloat(styl.fontWeight) || 400) >= 700;
         const prahPouzity = (font >= 24 || (font >= 18.66 && tuC)) ? prahVelky : prah;
@@ -130,16 +140,16 @@ for (const motiv of ['light', 'dark']) {
           najite.push({ pom: Math.round(pom * 100) / 100, cesta: cesta(el), text: text.slice(0, 44), barva: hex(mix(textBarva, pozadiBarva)), pozadi: hex(pozadiBarva), font: Math.round(font), prah: prahPouzity });
         }
       }
-      return najite;
-    }, PRAH, PRAHVelky).catch((e) => ({ chyba: String(e).slice(0, 160) }));
-    if (vysledek.chyba) { console.log(`  ${motiv}/${obrazovka}: ${vysledek.chyba}`); continue; }
-    if (!vysledek.length) continue;
-    nalezy += vysledek.length;
-    console.log(`\n== ${motiv} / ${obrazovka} ==`);
-    for (const r of vysledek.slice(0, 12)) {
+      return { najite, merit };
+    }, PRAH, PRAH_VELKY).catch((e) => ({ chyba: String(e).slice(0, 160) }));
+    if (vysledek.chyba) { console.log(`  ${motiv}/${nazev}: ${vysledek.chyba}`); continue; }
+    const { najite, merit } = vysledek;
+    console.log(`== ${motiv} / ${nazev}: ${merit} textových prvků, ${najite.length} pod prahem`);
+    nalezy += najite.length;
+    for (const r of najite.slice(0, 12)) {
       console.log(`  ${String(r.pom).padStart(5)} (prah ${r.prah}, ${r.font}px)  ${r.barva} na ${r.pozadi}  ${r.cesta}\n         „${r.text}“`);
     }
-    if (vysledek.length > 12) console.log(`  … a ${vysledek.length - 12} dalších`);
+    if (najite.length > 12) console.log(`  … a ${najite.length - 12} dalších`);
   }
 }
 console.log(`\ncelkem pod prahem: ${nalezy}`);
