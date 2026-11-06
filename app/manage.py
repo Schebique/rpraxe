@@ -822,7 +822,8 @@ def register(app: APIRouter, ctx) -> None:
                     info = {**r.json(), "dostupne": True}
         except Exception as vyjimka:                      # noqa: BLE001
             info = {"dostupne": False, "duvod": vyjimka.__class__.__name__}
-        _SANDBOX_CACHE = (time.time(), info)
+        if info.get("dostupne"):
+            _SANDBOX_CACHE = (time.time(), info)
         return info
 
     def _kontrola_dat(c) -> dict:

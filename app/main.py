@@ -450,7 +450,7 @@ manage_api.register(app, sys.modules[__name__])
 
 
 @app.get("/healthz")
-def healthz():
+async def healthz():
     return {"ok": True, "ts": time.time()}
 
 
