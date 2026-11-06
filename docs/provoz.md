@@ -87,5 +87,7 @@ vidět čerstvý čas bez čekání na noc.
   že se nic neodvolává na pevnou barvu místo tokenů — jinak by audit lhal.
   Výsledek: „N/H barev prochází“, u světlého motivu vypíše i barvy, které
   v něm nejsou překryté (např. `--sytost`)
-- `scripts/zalohy-hlidani.py` — v cronu na hostiteli; kontroluje stáří záloh
-  na NASu a oznámí to, kdyby poslední byla příliš stará
+- zálohy hlídá karta Správa → Zálohy: když je poslední snímek starší než
+  den, vypíše varování (plánovaná úloha `rpraxe-zaloha` spouští
+  `rpraxe-zaloha.sh` každé ráno v 03:40, posílá kopii na NAS a zapíše
+  `state/zaloha.json`)
