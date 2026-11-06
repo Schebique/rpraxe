@@ -1189,6 +1189,10 @@ async function renderBackupCard() {
   if (!box) return;
   let data;
   try { data = await api("/api/admin/backups"); } catch (e) { box.innerHTML = `<p class="err">${esc(t("není spojení"))}</p>`; return; }
+  // velikosti datasetů patří k zálohám — správce tak vidí, co se zálohuje a co roste
+  let datasety = [];
+  try { datasety = (await api("/api/admin/datasets")).soubory || []; }
+  catch (e) { datasety = []; }
   const bk = data.prehled || {};
   const snimky = data.snimky || [];
   const last = bk.last || {};
@@ -1216,7 +1220,16 @@ async function renderBackupCard() {
     <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px">
       <button id="adm-backup" class="ghost" type="button">${esc(t("udělat snímek teď"))}</button>
     </div>
-    <p class="tiny muted" id="bk-stav" role="status"></p>`;
+    <p class="tiny muted" id="bk-stav" role="status"></p>
+    <details class="tiny" style="margin-top:8px">
+      <summary>${esc(t("Velikosti datasetů"))}</summary>
+      ${datasety.length ? `<div style="overflow:auto"><table>
+        <tr><th>${esc(t("soubor"))}</th><th>${esc(t("velikost"))}</th><th>${esc(t("používá úloh"))}</th></tr>
+        ${datasety.map(d => `<tr><td class="tiny">${esc(d.jmeno)}</td><td class="tiny">${
+            d.bytes > 1048576 ? (d.bytes / 1048576).toFixed(1) + " MB" : (d.bytes / 1024).toFixed(0) + " kB"
+          }</td><td class="tiny${d.pouziva ? "" : " err"}">${d.pouziva || esc(t("nikdo"))}</td></tr>`).join("")}
+      </table></div>` : `<p class="tiny muted">${esc(t("zatím žádná data"))}</p>`}
+    </details>`;
   translateDom(box);
   $("#adm-backup").onclick = async () => {
     const r = await api("/api/admin/backup", { method: "POST", body: "{}" });

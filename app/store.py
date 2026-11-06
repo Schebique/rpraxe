@@ -97,6 +97,45 @@ def init() -> None:
         migrace(c)
 
 
+# Lidské názvy dovedností — v progresu se má objevit „Typy dat“, ne syrový klíč „typy“.
+# Klíče Zadavatelé píší do úloh; neznámý klíč se jen rozebere, ať není podtržítko.
+LIDSKE_NAZVY = {
+    "typy": "Typy dat", "class": "Třída objektu", "zaklady": "Základy",
+    "operatory": "Operátory", "promenne": "Proměnné", "indexace": "Indexování",
+    "vektory": "Vektory", "jmenovane_vektory": "Jmenované vektory",
+    "dplyr": "dplyr", "filter": "filter()", "mutate": "mutate()", "select": "select()",
+    "group_by": "group_by()", "summarise": "summarise()", "summarize": "summarize()",
+    "arrange": "arrange()", "pull": "pull()", "pipes": "Pipeline %>%",
+    "nacitani": "Načtení dat", "read": "read.csv / readr", "readr": "readr",
+    "cisteni": "Čištění dat", "funkce": "Funkce", "argumenty": "Argumenty funkcí",
+    "cykly": "Cykly", "for": "for", "while": "while", "break": "break",
+    "vektorizace": "Vektorizace", "apply": "apply()", "sapply": "sapply()",
+    "tapply": "tapply()", "rowMeans": "rowMeans()", "data.frame": "data.frame",
+    "matice": "Matice", "agregace": "Agregace", "ifelse": "ifelse()",
+    "logika": "Logika", "negace": "Negace", "faktory": "Faktory",
+    "datum": "Datum a čas", "as.Date": "as.Date()", "as.numeric": "as.numeric()",
+    "format": "Formátování", "which": "which()", "performance": "Výkon kódu",
+    "join": "Spojení tabulek", "ggplot": "ggplot2", "graf": "Grafy",
+}
+
+
+def lidsky_nazev(klic: str) -> str:
+    """Český název dovednosti; u neznámého klíče aspoň bez podtržítek."""
+    if klic in LIDSKE_NAZVY:
+        return LIDSKE_NAZVY[klic]
+    return klic.replace("_", " ").replace("-", " ").strip().capitalize()
+
+
+def oprav_nazvy_dovednosti(c: sqlite3.Connection) -> int:
+    """Doplní lidské názvy i k dovednostem, které vznikly dřív, než se začalo label ukládat."""
+    bez_nazvu = [r["key"] for r in c.execute(
+        "SELECT key FROM skill_labels WHERE label IS NULL OR label = key")]
+    if bez_nazvu:
+        c.executemany("UPDATE skill_labels SET label=? WHERE key=?",
+                      [(lidsky_nazev(k), k) for k in bez_nazvu])
+    return len(bez_nazvu)
+
+
 def migrace(c: sqlite3.Connection) -> None:
     """Doplní, co přibylo s novými funkcemi — stará databáze zůstane čitelná."""
     sloupce = {r["name"] for r in c.execute("PRAGMA table_info(tasks)")}
@@ -105,6 +144,8 @@ def migrace(c: sqlite3.Connection) -> None:
     # vlastní „zahodit“ je věc každého žáka — úloha se nikam nesmí smazat globally
     c.execute("CREATE TABLE IF NOT EXISTS dropped("
               "user TEXT, task TEXT, ts REAL, PRIMARY KEY(user, task))")
+    # stará databáze zná jen syrové klíče — progressed se má tvářit lidsky i po upgradu
+    oprav_nazvy_dovednosti(c)
 
 
 PREF_DEFAULTS = {"val": 20, "focus": "", "theme": "auto", "model": "", "lang": "cs"}

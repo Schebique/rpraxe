@@ -202,9 +202,9 @@ def main() -> int:
         kod, _ = ucitel.json(cesta)
         check(kod < 500, f"učitel dostane odpověď na {cesta}", str(kod))
     kod, prepis = ucitel.json("/api/class")
-    jmena = [z.get("user") for z in prepis.get("students", [])]
+    jmena = [z.get("name") or z.get("zak") for z in (prepis.get("zaci") or prepis.get("students", []))]
     check(jmena == [DOCASNY_ZAK], "učitel v přehledu vidí jen své žáky", str(jmena)[:70])
-    kod, data = spravce.json("/api/backups")
+    kod, data = spravce.json("/api/admin/backups")
     check(kod == 200 and isinstance(data, dict), "přehled záloh", str(kod))
     kod, data = spravce.json("/api/admin/datasets")
     check(kod == 200 and "soubory" in data, "správa dat ukáže i velikosti", str(kod))

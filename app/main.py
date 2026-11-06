@@ -341,7 +341,7 @@ def load_banks() -> int:
                 n += 1
                 for s in t.get("skills") or []:
                     c.execute("INSERT OR IGNORE INTO skill_labels(key,label,lesson) VALUES(?,?,?)",
-                              (s, s, int(t.get("lesson") or 0)))
+                              (s, store.lidsky_nazev(s), int(t.get("lesson") or 0)))
     return n
 
 
@@ -749,7 +749,7 @@ def grade_and_record(c: sqlite3.Connection, user: str, task: dict, ok: bool | No
                   "ON CONFLICT(key,user) DO UPDATE SET theta=excluded.theta, n=excluded.n",
                   (s, user, new_theta, new_n))
         c.execute("INSERT OR IGNORE INTO skill_labels(key,label,lesson) VALUES(?,?,?)",
-                  (s, s, int(task.get("lesson") or 0)))
+                  (s, store.lidsky_nazev(s), int(task.get("lesson") or 0)))
     new_level = adaptive.update_level(float(task["level"]), q)
     c.execute("UPDATE tasks SET level = ? WHERE id = ?", (new_level, task["id"]))
     sr = c.execute("SELECT ease, reps, lapses FROM srs WHERE task=? AND user=?", (task["id"], user)).fetchone()
@@ -1140,14 +1140,6 @@ async def overeni_spustenim(task: dict) -> dict:
     vysledek["duvody"] = duvody
     vysledek["ok"] = not duvody
     return vysledek
-
-
-@app.get("/api/backups")
-def api_backups(request: Request):
-    """Stav zálohování — pro dashboard i pro krizovou obnovu."""
-    if not is_admin(current_user(request) or ""):
-        raise HTTPException(403, "jen pro správce")
-    return backup_status()
 
 
 @app.get("/api/export")

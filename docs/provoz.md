@@ -70,3 +70,22 @@ vidět čerstvý čas bez čekání na noc.
 | chybějící dataset | Správa → Provoz | úloha odkazuje na soubor, který nikdo nenahrál |
 | zadržené účty | Správa → Provoz | někdo zkouší hádat hesla (nebo si to uživatel zasloužil) |
 | runner nedostupný | `/healthz`, Provoz | pískoviště vstalo nebo nemá data |
+
+
+## Kontrola kvality
+- `test/provoz.py` — projde aplikaci od přihlášení až po úklid: účty, brzba,
+  role, všechny obrazovky, třídy, odhlášení ostatních relací, export CSV.
+  Špatné heslo schválně zkouší, proto účet otestovaného žáka zámkně — proto
+  test začíná přihlášením přes API, které zámek projde. Po sobě uklidí
+  (smaze zkušební třídu i účty); když uprostřed spadne, maž ručně:
+  `DELETE /api/classes/<id>` a `DELETE /api/users/<ucet>?potvrdit=<ucet>`
+- `test/provaznost.py` — účty, role, poznámky učitele, plán, glosář, export
+- `test/ucty.py` — migrace účtů z obrazu do stavu
+- `scripts/kontrast.py` — projde `web/style.css` a `web/index.html` a
+  spočítá kontrast každé barvy s podkladem, na kterém se používá, pro tmavý
+  i světlý motiv (WCAG AA — drobné písmo 4,5:1, velké 3:1). Hlídá také to,
+  že se nic neodvolává na pevnou barvu místo tokenů — jinak by audit lhal.
+  Výsledek: „N/H barev prochází“, u světlého motivu vypíše i barvy, které
+  v něm nejsou překryté (např. `--sytost`)
+- `scripts/zalohy-hlidani.py` — v cronu na hostiteli; kontroluje stáří záloh
+  na NASu a oznámí to, kdyby poslední byla příliš stará
