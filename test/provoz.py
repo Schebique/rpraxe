@@ -191,6 +191,24 @@ def main() -> int:
     kod, _ = jine.json("/api/bootstrap")
     check(kod != 200, "staré sedení už nevystačí", str(kod))
 
+    print("\n5) každá obrazovka musí odpovědět — žádná padesátka")
+    # obrazovky, kde se chybující SQL dotaz schová za prázdnou stránku
+    for cesta in ("/api/bootstrap", "/api/plan", "/api/tasks", "/api/progress",
+                  "/api/cheatsheet", "/api/notes", "/api/datasets", "/api/settings",
+                  "/api/whoami", "/api/export"):
+        kod, _ = zak.json(cesta)
+        check(kod < 500, f"žák dostane odpověď na {cesta}", str(kod))
+    for cesta in ("/api/class", "/api/classes", "/api/tasks?status=all", "/api/progress"):
+        kod, _ = ucitel.json(cesta)
+        check(kod < 500, f"učitel dostane odpověď na {cesta}", str(kod))
+    kod, prepis = ucitel.json("/api/class")
+    jmena = [z.get("user") for z in prepis.get("students", [])]
+    check(jmena == [DOCASNY_ZAK], "učitel v přehledu vidí jen své žáky", str(jmena)[:70])
+    kod, data = spravce.json("/api/backups")
+    check(kod == 200 and isinstance(data, dict), "přehled záloh", str(kod))
+    kod, data = spravce.json("/api/admin/datasets")
+    check(kod == 200 and "soubory" in data, "správa dat ukáže i velikosti", str(kod))
+
     print("\n6) úklid")
     if id_tridy:
         kod, _ = spravce.posli(f"/api/classes/{id_tridy}?potvrdit={id_tridy}", metoda="DELETE")

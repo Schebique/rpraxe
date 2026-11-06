@@ -155,3 +155,25 @@ def lesson_focus(today: date | None = None) -> list[str]:
     focus = list(LESSONS.get(n, {}).get("skills", []))
     focus += list(LESSONS.get(max(1, n - 1), {}).get("skills", []))
     return list(dict.fromkeys(focus))
+
+
+# Karta „Pokud narazíš na chybu“: nejčastější hlášky interpretu a co s nimi.
+# Řazené od nejčastější po nejméně častou (zkušenost z kroužku).
+ERROR_HELP = [
+    ("object '...' not found", "Proměnná neexistuje. Spusť i řádek, který ji vytváří; "
+     "R rozlišuje velká a malá písmena a mezery okolo <- nevadí, uvnitř jména ano."),
+    ("could not find function", "Chybí balíček. Nainstaluj ho install.packages(\"dplyr\") "
+     "a načti library(dplyr). Jméno piš přesně, i s tečkou (read.csv)."),
+    ("non-numeric argument to mathematical function", "Počítáš s textem. Podívej se na "
+     "class(x), str(df); sloupec načitný z CSV bývá faktor/character."),
+    ("undefined columns selected", "Takový sloupec v data.frame není. Přesná jména: names(df)."),
+    ("subscript out of bounds", "Indexuješ mimo rozsah. Délku zjistíš length(v), "
+     "místo v[10] raději v[10] jen když 10 <= length(v)."),
+    ("longer object length is not a multiple of shorter object length", "Vektory mají "
+     "různou délku. Porovnej length(x) a length(y)."),
+    ("cannot open the connection", "Soubor není tam, kde to zkoušíš. getwd() ukáže, "
+     "kde jsi; setwd(\"...\") nebo napiš celou cestu."),
+    ("unused argument", "V zápisu funkce navíc. Zkontroluj závorky, čárky a = u pojmenovaných "
+     "argumentů (mean(x, na.rm = TRUE))."),
+]
+

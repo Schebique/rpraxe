@@ -372,8 +372,25 @@ async function loadTahak() {
   $("#sheet").innerHTML = tahakHtml;
 }
 
+let chybyHtml = "";
+async function fillGlossary() {
+  // karta „Pokud narazíš na chybu“ — bez toho zůstane prázdná a mate žáka
+  const box = $("#glossary");
+  if (!box) return;
+  if (!chybyHtml) {
+    try {
+      const c = await api("/api/cheatsheet");
+      chybyHtml = (c.error_help || []).map(([chyba, rada]) =>
+        `<p class="tiny"><code>${esc(chyba)}</code><br><span class="muted">${esc(rada)}</span></p>`
+      ).join("") || "<p class='tiny muted'>tipy zatím nejsou.</p>";
+    } catch { chybyHtml = "<p class='tiny muted'>tipy se nepodařilo načíst.</p>"; }
+  }
+  box.innerHTML = chybyHtml;
+}
+
 async function loadProg() {
   const p = await api("/api/progress");
+  fillGlossary();
   const rate = p.total ? Math.round(100 * p.passed / p.total) : 0;
   $("#kpis").innerHTML = [
     ["Úspěšnost na první dobrou", `${p.first_try_rate ?? "—"} %`, "bez nápovědy a bez opakování"],

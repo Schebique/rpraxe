@@ -384,12 +384,16 @@ def register(app: APIRouter, ctx) -> None:
     # -------------------------------------------------- přehled žáků (učitel)
     @router.get("/api/class")
     def api_class(request: Request):
-        staff(request)
+        """Přehled žáků. Učitel vidí jen ty, které vedve aspoň v jedné třídě."""
+        kdo, role = staff(request)
         users = ctx.ensure_users()
         out = []
         with ctx.db() as c:
+            moji = None if role == "admin" else set(_zaci_ucitele(c, kdo))
             for name, rec in sorted(users.items()):
                 if rec.get("role", "student") != "student":
+                    continue
+                if moji is not None and name not in moji:
                     continue
                 st = store.user_stats(c, name, days=120)
                 last = c.execute("SELECT MAX(ts) FROM attempts WHERE user=?", (name,)).fetchone()[0]

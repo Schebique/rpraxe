@@ -899,8 +899,9 @@ def api_progress(request: Request, days: int = 60):
                FROM attempts a JOIN tasks t ON t.id = a.task
                WHERE a.user = ? GROUP BY t.lesson ORDER BY t.lesson""", (user,))]
         weak = [dict(r) for r in c.execute(
-            """SELECT s.key, s.label, s.theta, s.n FROM skills s
-               WHERE s.n > 0 ORDER BY s.theta ASC LIMIT 6""")]
+            """SELECT s.key, COALESCE(l.label, s.key) AS label, s.theta, s.n
+                 FROM skills s LEFT JOIN skill_labels l ON l.key = s.key
+                WHERE s.user = ? AND s.n > 0 ORDER BY s.theta ASC LIMIT 6""", (user,))]
         recent = [dict(r) for r in c.execute(
             """SELECT a.ts, a.task, a.ok, a.hints, t.title, t.level FROM attempts a
                JOIN tasks t ON t.id = a.task WHERE a.user=? ORDER BY a.ts DESC LIMIT 25""", (user,))]
@@ -965,7 +966,7 @@ def opakovani(c: sqlite3.Connection, user: str) -> dict:
 def api_cheatsheet(request: Request):
     """Tahák po lekcích — zvlášť, aby záložka nečekala na celý progres."""
     return {"cheatsheet": syllabus.CHEATSHEET, "lesson_current": syllabus.current_lesson(),
-            "syllabus": task_lessons()}
+            "error_help": syllabus.ERROR_HELP, "syllabus": task_lessons()}
 
 
 @app.get("/api/notes")

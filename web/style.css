@@ -47,6 +47,9 @@ button:hover{border-color:var(--accent);background:var(--hover)}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:650}
 button.primary:hover{filter:brightness(1.12)}
 button.ghost{background:transparent}
+a.ghost{display:inline-block;font:inherit;text-decoration:none;border-radius:8px;
+       border:1px solid var(--line);background:transparent;color:var(--fg);padding:7px 13px}
+a.ghost:hover{border-color:var(--accent);background:var(--hover)}
 button:disabled{opacity:.45;cursor:not-allowed}
 input,select,textarea{font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
 label{display:block;margin:10px 0 4px;font-size:13px;color:var(--muted)}
