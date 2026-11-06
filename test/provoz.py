@@ -175,7 +175,7 @@ def main() -> int:
           str(len(tridy.get("tridy", []))))
     if id_tridy:
         kod, csv = ucitel.posli(f"/api/classes/{id_tridy}/export")
-        check(kod == 200 and csv.startswith("zak;"), "export třídy je CSV", f"{kod}")
+        check(kod == 200 and csv.lstrip("\ufeff").startswith("zak;"), "export třídy je CSV", f"{kod}")
         cizinec = Prihlaseny()
         cizinec.prihlas("lenka", zak_heslo)
         kod, _ = cizinec.posli(f"/api/classes/{id_tridy}/export")

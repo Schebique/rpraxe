@@ -791,7 +791,8 @@ def register(app: APIRouter, ctx) -> None:
         # název souboru musí zůstat v ASCII hlavičce — třídy mají jména s háčky
         nazev = unicodedata.normalize("NFKD", trida["name"]).encode("ascii", "ignore").decode("ascii")
         nazev = "".join(ch if ch.isalnum() else "-" for ch in nazev)[:40]
-        return Response("\n".join(csv), media_type="text/csv; charset=utf-8",
+        # BOM na začátku — jinak Excel otevře háčky jako rozsypaný písmokopis
+        return Response("\ufeff" + "\n".join(csv), media_type="text/csv; charset=utf-8",
                         headers={"content-disposition":
                                  f'attachment; filename="trida-{nazev}-{ctx.today()}.csv"'})
 

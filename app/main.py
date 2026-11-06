@@ -1145,7 +1145,8 @@ async def overeni_spustenim(task: dict) -> dict:
 @app.get("/api/backups")
 def api_backups(request: Request):
     """Stav zálohování — pro dashboard i pro krizovou obnovu."""
-    admin(request)
+    if not is_admin(current_user(request) or ""):
+        raise HTTPException(403, "jen pro správce")
     return backup_status()
 
 
@@ -1159,12 +1160,13 @@ def api_export(request: Request):
     def esc(v):
         s = str(v if v is not None else "")
         return '"' + s.replace('"', '""').replace("\n", " ") + '"'
-    csv_lines = ["cas;uloha;titulek;lekce;uspech;nnapovedy;kod"]
+    csv_lines = ["cas;uloha;titulek;lekce;uspech;napovedy;kod"]
     for r in rows:
         csv_lines.append(";".join([esc(datetime.fromtimestamp(r["ts"]).isoformat(timespec="seconds")),
                                    esc(r["task"]), esc(r.get("title")), esc(r.get("lesson")),
                                    esc("ano" if r["ok"] else "ne"), esc(r["hints"]), esc(r["code"])]))
-    return Response("\n".join(csv_lines), media_type="text/csv; charset=utf-8",
+    # BOM na začátku — jinak Excel otevře háčky jako rozsypaný písmokopis
+    return Response("\ufeff" + "\n".join(csv_lines), media_type="text/csv; charset=utf-8",
                     headers={"content-disposition": f'attachment; filename="procvicovani-{today()}.csv"'})
 
 
@@ -1185,7 +1187,12 @@ def logout_all(request: Request):
     users = posun_epochu(users, user)
     _users_save(users)
     print(f"[rpraxe] {datetime.now():%Y-%m-%d %H:%M} ucet {user}: odhlasen vsechna zarizeni", flush=True)
-    return {"ok": True, "msg": "odhlášeno z ostatních zařízení"}
+    # tohle zařízení zůstane přihlášené — bez nového kolečka by se odhlásil i ten,
+    # kdo tlačítko stiskl, a to slibuje „z ostatních zařízení“
+    odpoved = JSONResponse({"ok": True, "msg": "odhlášeno z ostatních zařízení"})
+    odpoved.set_cookie("rpraxe", make_token(user), httponly=True, samesite="lax",
+                       max_age=30 * 86400, secure=request_is_https())
+    return odpoved
 
 
 @app.get("/api/whoami")
