@@ -47,21 +47,29 @@ Features at a glance:
 ```sh
 git clone <repo> && cd rpraxe
 cp rpraxe.env.example rpraxe.env && chmod 600 rpraxe.env      # vyplň hesla účtů
-docker build -t rpraxe:1 .
+docker pull ghcr.io/<vlastník>/rpraxe:latest                   # hotový image
+docker tag ghcr.io/<vlastník>/rpraxe:latest rpraxe:2           # …nebo `docker build -t rpraxe:2 .`
+mkdir -p state datasets && sudo chown -R 4242:0 state datasets # kontejner běží pod UID 4242
 docker compose up -d
-docker compose exec app Rscript /srv/r/gen_datasets.R         # syntetická data
-docker compose exec app /opt/venv/bin/python /srv/scripts/validate.py
+docker compose exec rpraxe Rscript /srv/r/gen_datasets.R       # syntetická data
+docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py
+curl -s 'http://127.0.0.1:8710/healthz?detail=1'               # aplikace + běžiště R
 ```
 
 Pak `http://127.0.0.1:8710` (nebo `http://localhost:${RPRAXE_PORT}`). První
 přihlášení funguje s hesly z `rpraxe.env`; pak si je každý změní v profilu a
 od té doby platí jen to, co je v `state/users.json`.
 
+`docker-compose.yml` je varianta **jeden kontejner** (aplikace i R uvnitř) —
+stejný chod jako v Kubernetes. Variantu, kde R běží v kontejneru **bez přístupu
+ven**, spustíš jako `docker compose -f docker-compose.dva-slouzby.yml up -d`;
+kdy a jak kterou je rozepsané v [`docs/hosting.md`](docs/hosting.md).
+
 Without Docker (during development):
 
 ```sh
-docker compose up -d runner
 python -m venv .venv && .venv/bin/pip install fastapi "uvicorn[standard]" httpx pyyaml python-multipart
+RPRAXE_SERVE=runner .venv/bin/python -m uvicorn runner.server:app --port 8081 &
 RPRAXE_DB=./state/dev.db RPRAXE_RUNNER=http://127.0.0.1:8081 \
   .venv/bin/uvicorn app.main:app --app-dir . --port 8710
 ```
@@ -77,16 +85,21 @@ Všechno se nastavuje proměnnými prostředí — kompletní komentovaný sezna
 | `RPRAXE_PASS_<ÚČET>` | výchozí heslo účtu (použije se jen při prvním založení) | — |
 | `RPRAXE_SECRET` | podpis session cookie (`openssl rand -hex 32`) | vygeneruje se do `state/secret.key` |
 | `RPRAXE_PROVIDER` | `ollama` / `openai` / `anthropic` / `gemini` | `ollama` |
-| `RPRAXE_OLLAMA` | adresa modelu (Ollama, OpenAI-kompatibilní brána…) | `http://127.0.0.1:11434` |
+| `RPRAXE_AI_ADRESA` | adresa modelu (Ollama, OpenAI-kompatibilní brána, e-INFRA LLM API…); `RPRAXE_OLLAMA` je starší název | `http://127.0.0.1:11434` |
 | `RPRAXE_AI_KEY` | API klíč poskytovatele (nepovinný u vlastní Ollamy) — nebo ho vyplň ve správě | prázdné |
 | `RPRAXE_MODEL` / `RPRAXE_MODEL_WRITE` | model kouče / generování úloh | `qwen3.5:9b` / `qwen3.6:35b-a3b` |
 | `RPRAXE_DB`, `RPRAXE_DATASETS`, `RPRAXE_WEB`, `RPRAXE_TASKS` | cesty uvnitř kontejneru | výchozí sedí |
 | `RPRAXE_CPU_LIMIT`, `RPRAXE_WALL_LIMIT`, `RPRAXE_MEM_MB` | limity sandboxu | `20`, `30`, `1500` |
+| `RPRAXE_RUNNER_PROMIT` / `RPRAXE_SERVE` / `RPRAXE_RUNNER` | jak je postavený sandbox: vestavěný, nebo běžec v jiném kontejneru | `1` / `app` / `http://rpraxe-runner:8081` |
 | `RPRAXE_SSO_*` | přihlášení přes bránu, viz [docs/sso.md](docs/sso.md) | vypnuto |
 | `RPRAXE_BIND`, `RPRAXE_PORT` (v souboru `.env`) | na čem poslouchá container | `127.0.0.1:8710` |
 
 AI vrstva je nepovinná: bez modelu funguje zadávání, kontrola, adaptivní plán i
 progres; kouč jen odpoví z ručně psaných nápověd.
+
+Kde to spustit (jeden kontejner, dva kontejnery bez sítě, Kubernetes, CESNET),
+jak přibalit R knihovny, jak zálohovat a přenést data na jiný stroj a co dělat,
+když appka naskočí, ale úlohy ne: [`docs/hosting.md`](docs/hosting.md).
 
 **Proměnné prostředí jsou jen výchozí hodnoty.** Provider, adresu, klíče, modely
 i přihlášení přes bránu přepneš bez restartu v menu **Správa** — ukládají se do
@@ -134,7 +147,10 @@ Menu **Správa → Modely** nastaví, odkud se AI bere: vlastní Ollama,
 OpenAI-kompatibilní brána (včetně GitHub Models, Groq či vLLM — jen přepíšeš
 adresu), Anthropic nebo Google Gemini, zvlášť model na povídání a na tvorbu
 úloh. Uloženo v `state/config.json` (mód 600), klíč se do prohlížeče nevrací.
-Tlačítko *uložit a vyzkoušet* rovnou napíše, jestli model odpovídá.
+Tlačítko *uložit a vyzkoušet* rovnou napíše, jestli model odpovídá. Pro
+akademické nasazení je tam i předvolba **e-INFRA LLM API** (`RPRAXE_PROVIDER=einfra`,
+`https://llm.ai.e-infra.cz/v1`, styl OpenAI) — klíč si vygeneruje každý v Chat WebUI
+a název modelu zkopíruje ze seznamu, protože se mění.
 Karta u každého poskytovatele řekne, jestli data opouštějí dům, kde se bere
 adresa (Ollama `http://stroj:11434`, OpenAI `https://api.openai.com/v1`, GitHub
 Models `https://models.inference.ai.azure.com`, Groq, vLLM …) a odkazy, kde
@@ -263,7 +279,8 @@ na konci napíše `N v pořádku, M s problémem z K`.
 
 ## Naše nasazení (domácí)
 
-Na jednom miniPC: `docker compose` s image `rpraxe:1`, aplikace na
+Na jednom miniPC: `docker compose` (varianta dva kontejnery, takže R nemá
+přístup ven) s image `rpraxe:2`, aplikace na
 `172.20.0.1:8710`, před ní Caddy brána s wildcard certifikátem, DNS přes
 Pi-hole — `https://r-praxe.schebique.eu`, dostupné z LAN a tailnetu, nikdy
 veřejně. Kouč i generátor běží na Ollamě na sousedním stroji
@@ -274,8 +291,9 @@ týdně a záloha jednou denně na NAS s rotací 7 dnů.
 
 ```sh
 python -m compileall app runner agent scripts tasks        # syntax
-docker compose exec app /opt/venv/bin/python /srv/scripts/check_static.py
-docker compose exec app /opt/venv/bin/python /srv/scripts/validate.py
+python3 scripts/validate.py                                # banka úloh i bez kontejneru
+docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/check_static.py
+docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py
 ```
 
 Frontend se dá ověřit i bez prohlížeče přes jsdom
@@ -285,7 +303,11 @@ spustit na běžící instanci, projde to totiž skutečným klikáním:
 ```sh
 RPRAXE_URL=http://127.0.0.1:8710 node test/dom.mjs ondra   # správce
 RPRAXE_URL=http://127.0.0.1:8710 node test/dom.mjs lenka   # student
-``` Podmínky pull requestu:
+```
+
+Provoz hotové instance (zálohy, obnova, denní kontrola) má vlastní
+[`docs/provoz.md`](docs/provoz.md), nasazení a migrace
+[`docs/hosting.md`](docs/hosting.md). Podmínky pull requestu:
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Licence

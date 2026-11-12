@@ -39,6 +39,17 @@ PROVIDERS: dict[str, dict] = {
         "venku": True,
         "popis": "Sedí i na Groq, Together, GitHub Models nebo vLLM — stačí přepsat adresu.",
     },
+    "einfra": {
+        "jmeno": "e-INFRA CZ / MetaCentrum (OpenAI API)",
+        "styl": "openai",
+        "adresa": "https://llm.ai.e-infra.cz/v1",
+        "model": "qwen3.5-397b-a17b",
+        "model_psani": "qwen3.5-397b-a17b",
+        "venku": True,
+        "popis": "Modely CERIT-SC pro akademickou sféru. Klíč si dělá každý sám "
+                 "v Chat WebUI (Accounts → API Keys); přesný název modelu zkopíruj "
+                 "odtud ze seznamu.",
+    },
     "anthropic": {
         "jmeno": "Anthropic (Claude)",
         "styl": "anthropic",
@@ -65,7 +76,11 @@ def _vychozi() -> dict:
     return {
         "ai": {
             "poskytovatel": os.environ.get("RPRAXE_PROVIDER", DEFAULT_PROVIDER),
-            "adresa": os.environ.get("RPRAXE_OLLAMA") or PROVIDERS[DEFAULT_PROVIDER]["adresa"],
+            # viz docs/hosting.md: volba poskytovatele prostředím (pro nasazení bez UI)
+            # RPRAXE_AI_ADRESA platí pro jakéhokoli poskytovatele; RPRAXE_OLLAMA
+            # zůstává jako domecká alternativa (adresa Ollamy se tak zadávala dřív)
+            "adresa": (os.environ.get("RPRAXE_AI_ADRESA") or os.environ.get("RPRAXE_OLLAMA")
+                       or PROVIDERS[DEFAULT_PROVIDER]["adresa"]),
             "klic": os.environ.get("RPRAXE_AI_KEY", ""),
             "model": os.environ.get("RPRAXE_MODEL", ""),
             "model_psani": os.environ.get("RPRAXE_MODEL_WRITE", ""),

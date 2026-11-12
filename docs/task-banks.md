@@ -54,8 +54,8 @@ v úloze, ne ji opisovat.
 ## Ověření celé banky
 
 ```sh
-docker compose exec app /opt/venv/bin/python /srv/scripts/validate.py         # všechno
-docker compose exec app /opt/venv/bin/python /srv/scripts/validate.py pipe-03 # jedna
+docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py         # všechno
+docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py pipe-03 # jedna
 ```
 
 Validátor pro každou úlohu: (1) pustí `reseni` v sandboxu a zavolá `check` —
@@ -115,5 +115,5 @@ hry, ověří je stejnou cestou jako validátor**. Co neprojde, zůstává v tab
 stejnou cestu k sandboxu i databázi:
 
 ```sh
-docker compose exec app /opt/venv/bin/python /srv/agent/nightly.py 8
+docker compose exec rpraxe /opt/venv/bin/python /srv/agent/nightly.py 8
 ```

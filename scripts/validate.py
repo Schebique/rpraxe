@@ -11,7 +11,15 @@ import os
 import sys
 import urllib.request
 
-RUNNER = os.environ.get("RPRAXE_RUNNER", "http://runner:8081")
+# Adresu řeší app/behriste.py — uvnitř kontejneru, i když je sandbox vestavěný
+# a `docker compose exec` nedostal proměnné z entrypointu.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    from app.behriste import adresa as _adresa_behrziste
+    RUNNER = _adresa_behrziste()
+except Exception:                                   # skript mimo balíček app/
+    RUNNER = (os.environ.get("RPRAXE_RUNNER") or "http://rpraxe-runner:8081").rstrip("/")
+
 TASKS_DIR = os.environ.get("RPRAXE_TASKS", "/srv/tasks")
 LIBS = ["dplyr", "tidyr", "ggplot2", "readr", "forcats", "lubridate"]
 

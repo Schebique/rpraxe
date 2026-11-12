@@ -17,7 +17,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-ZAKLADNA = "http://172.20.0.1:8710"   # binduje se na adresu brány, ne na loopback
+# proti jiné instalaci: RPRAXE_TEST_URL=... RPRAXE_TEST_KONT=... python3 test/provoz.py
+ZAKLADNA = os.environ.get("RPRAXE_TEST_URL", "http://172.20.0.1:8710")
+KONT = os.environ.get("RPRAXE_TEST_KONT", "rpraxe-app-1")
+SOUBOR_S_HESLY = os.environ.get("RPRAXE_ENV_FILE", "rpraxe.env")
 ADRESAR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCASNY_UCE = "zkusni-ucitel"
 DOCASNY_ZAK = "zkusni-zak"
@@ -39,7 +42,7 @@ def check(ok: bool, text: str, detail: str = "") -> bool:
 
 
 def heslo_z_env(klic: str) -> str:
-    with open(os.path.join(ADRESAR, "rpraxe.env"), encoding="utf-8") as soubor:
+    with open(os.path.join(ADRESAR, SOUBOR_S_HESLY), encoding="utf-8") as soubor:
         najdene = re.search(rf"^{klic}=(.*)$", soubor.read(), re.M)
     return najdene.group(1).strip() if najdene else ""
 
@@ -95,7 +98,7 @@ def main() -> int:
         return 2
 
     print("\n1) účty žijí ve stavu, ne v obrazu")
-    stav = subprocess.run(["sudo", "docker", "exec", "rpraxe-app-1", "sh", "-c",
+    stav = subprocess.run(["sudo", "docker", "exec", KONT, "sh", "-c",
                            "test -f /data/state/users.json && echo SOUBOR-JE; "
                            "ls /srv | grep -c 'lenka:' || true"],
                           capture_output=True, text=True, timeout=60)
@@ -116,7 +119,7 @@ def main() -> int:
     kod, telo = zkusebni.prihlas("nic-takovy-ucet", "dalsi-spatne-heslo")
     check(kod == 429 or "Příliš mnoho" in telo, "po šesti pokusech je zámek", str(kod))
     # úklid: zamčená adresa by jinak zablokovala celý zbytek testu
-    subprocess.run(["sudo", "docker", "exec", "rpraxe-app-1", "/opt/venv/bin/python", "-c",
+    subprocess.run(["sudo", "docker", "exec", KONT, "/opt/venv/bin/python", "-c",
                     "import sqlite3; c=sqlite3.connect('/data/state/rpraxe.db');"
                     "c.execute(\"DELETE FROM ai_cache WHERE key LIKE 'logfail:%'\"); c.commit()"],
                    capture_output=True, text=True, timeout=60)

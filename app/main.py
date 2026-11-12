@@ -24,11 +24,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import accounts, config as instance, adaptive, ai, store, syllabus
+from app.behriste import adresa as _adresa_behrziste
 
 WEB = Path(os.environ.get("RPRAXE_WEB", "/srv/web"))
 USERS_FILE = accounts.soubor_uctu()
 SECRET_FILE = Path(os.environ.get("RPRAXE_SECRET", "/data/state/secret.key"))
-RUNNER = os.environ.get("RPRAXE_RUNNER", "http://rpraxe-runner:8081")
+# adresa běžce R: vestavěný sandbox, nebo služba jinde — viz app/behriste.py
+RUNNER = _adresa_behrziste()
 USER = os.environ.get("RPRAXE_USER", "lenka")
 SSO_SECRET_HEADER = "x-rpraxe-sso"
 
@@ -54,7 +56,24 @@ def check_pw(pw: str, stored: str) -> bool:
     return accounts.check_pw(pw, stored)
 
 
+_USERS_CACHE: dict = {"sig": None, "users": None}
+
+
+def _users_cache_sig() -> tuple:
+    spec = os.environ.get("RPRAXE_USERS", "")
+    pass_items = tuple(sorted((k, v) for k, v in os.environ.items() if k.startswith("RPRAXE_PASS_")))
+    try:
+        st = USERS_FILE.stat()
+        mtime = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        mtime = None
+    return (str(USERS_FILE), mtime, spec, pass_items)
+
+
 def ensure_users() -> dict:
+    sig = _users_cache_sig()
+    if _USERS_CACHE["sig"] == sig and _USERS_CACHE["users"] is not None:
+        return {k: dict(v) for k, v in _USERS_CACHE["users"].items()}
     users = accounts.load(USERS_FILE)
     ulozit = not USERS_FILE.exists()
     vygenerovane, doplnene = accounts.seed_from_env(users)
@@ -71,6 +90,8 @@ def ensure_users() -> dict:
         ulozit = True
     if ulozit:
         accounts.save(USERS_FILE, users)
+    _USERS_CACHE["sig"] = _users_cache_sig()
+    _USERS_CACHE["users"] = {k: dict(v) for k, v in users.items()}
     return users
 
 
@@ -301,12 +322,18 @@ async def auth_guard(request: Request, call_next):
     _REQ_IS_HTTPS["v"] = request.headers.get("x-forwarded-proto", "http") == "https"
     path = request.url.path
     if path.startswith("/static") or path == "/login" or path == "/healthz":
-        return await call_next(request)
+        resp = await call_next(request)
+        if path.endswith((".js", ".css")):
+            resp.headers["Cache-Control"] = "no-cache"
+        return resp
     if not current_user(request):
         if path.startswith("/api/"):
             return JSONResponse({"error": "nepřihlášen"}, status_code=401)
         return HTMLResponse(LOGIN_PAGE.format(user="", err="", sso=sso_button()))
-    return await call_next(request)
+    resp = await call_next(request)
+    if path == "/":
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 # -------------------------------------------------------------- helpers ----
@@ -450,8 +477,24 @@ manage_api.register(app, sys.modules[__name__])
 
 
 @app.get("/healthz")
-async def healthz():
-    return {"ok": True, "ts": time.time()}
+async def healthz(detail: int = 0):
+    """Sonda pro healthcheck. Výchozí odpověď je schválně minimální a levná.
+
+    `?detail=1` připojí stav běžiště R — to, kvůli čemu studentská aplikace
+    zešediví, i když aplikace sama žije. V probech se tahle varianta nepoužívá,
+    ať sandbohu neděláme zátěž; hodí se při instalaci a při ladění.
+    """
+    out = {"ok": True, "ts": time.time(), "version": VERSION}
+    if detail:
+        out["sandbox_url"] = RUNNER
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as klient:
+                r = await klient.get(RUNNER.rstrip("/") + "/ping")
+                out["sandbox"] = r.json() if r.status_code == 200 else {"ok": False, "http": r.status_code}
+        except Exception as vyjimka:                       # noqa: BLE001
+            out["sandbox"] = {"ok": False, "duvod": vyjimka.__class__.__name__}
+        out["sready"] = bool(out["sandbox"].get("ok"))
+    return out
 
 
 # ------------------------------------------------------------------ API ----
@@ -520,7 +563,7 @@ def ensure_plan(c: sqlite3.Connection, user: str) -> list[dict]:
             if tid in odlozeno:
                 continue
             t = get_task(c, tid)
-            if not t or t.get("status") != "approved":
+            if not t or t.get("status") == "retired":
                 continue
             t["solved"] = tid in done
             t.pop("check_r", None); t.pop("reseni", None)
@@ -560,6 +603,7 @@ def api_pick(request: Request, body: PickBody):
         t = get_task(c, body.task_id)
         if not t:
             raise HTTPException(404, "neznámá úloha")
+        store.set_dropped(c, user, t["id"], False)
         row = c.execute("SELECT task_ids FROM plan WHERE day=? AND user=?", (today(), user)).fetchone()
         ids = json.loads(row["task_ids"]) if row else []
         if t["id"] not in ids:
@@ -874,15 +918,22 @@ def api_tasks(request: Request, lesson: int | None = None, skill: str | None = N
             q += " AND (status = 'approved' OR owner = ?)"
             args.append(kdo)
         q += " ORDER BY lesson, level, id"
-        odlozeno = store.dropped_for(c, kdo or USER)
+        uziv = kdo or USER
+        odlozeno = store.dropped_for(c, uziv)
+        pokusy = {
+            r["task"]: (r["n"], r["p"])
+            for r in c.execute(
+                "SELECT task, COUNT(*) n, COALESCE(SUM(ok),0) p FROM attempts WHERE user=? GROUP BY task",
+                (uziv,),
+            )
+        }
         out = []
         for r in c.execute(q, args):
             t = store.row_to_task(r)
             t["moje"] = bool(t.get("owner")) and t.get("owner") == kdo
             t["zahozena"] = t["id"] in odlozeno
-            a = c.execute("SELECT COUNT(*) n, COALESCE(SUM(ok),0) p FROM attempts WHERE user=? AND task=?",
-                          (current_user(request) or USER, t["id"])).fetchone()
-            t.update(attempts=a["n"], passed=a["p"])
+            n, p = pokusy.get(t["id"], (0, 0))
+            t.update(attempts=n, passed=p)
             for k in ("check_r", "reseni", "nacti"):
                 t.pop(k, None)
             out.append(t)

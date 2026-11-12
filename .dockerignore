@@ -1,3 +1,7 @@
+**/__pycache__/
+**/*.pyc
+.git/
 data/
+state/
 *.log
 .dockerignore.ck

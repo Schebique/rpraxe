@@ -1,0 +1,86 @@
+name: rpraxe-dva
+
+# DVĚ oddělené složky: sandbox R nemá kartu pro ven — ani DNS, ani IP.
+# Hodí se všude, kde chceš mít jistotu, že studentský kód nemůže nic stáhnout
+# ani nikam zavolat. Aplikace naopak ven smí (kvůli modelu).
+#
+#   docker compose -f docker-compose.dva-slouzby.yml up -d
+#
+# Stejný obraz, jen `RPRAXE_SERVE=runner` v sandboxu.
+
+services:
+  runner:
+    image: rpraxe:${RPRAXE_IMAGE_TAG:-2}
+    environment:
+      RPRAXE_SERVE: runner
+      RPRAXE_DATASETS: /data/datasets
+      RPRAXE_DATASETS_RO: "1"        # datasets jsou v tomhle kontejneru mountnuté jen pro čtení
+      RPRAXE_WORK: /work
+      RPRAXE_STATE: /data/state/runner
+      RPRAXE_CPU_LIMIT: "20"
+      RPRAXE_WALL_LIMIT: "30"
+      RPRAXE_MEM_MB: "1500"
+      # sandbox je bez DNS i bez routu; hláška o chybějící knihovně je pak
+      # pro studenta jasná, jen ji runner nesmí zkoušet řešit pokusem o stažení
+      NOT_CRAN: "true"
+    volumes:
+      - ./datasets:/data/datasets:ro
+      - runner-state:/data/state
+    tmpfs:
+      - /work:size=512m,mode=1777,uid=4242,gid=4242
+    restart: unless-stopped
+    networks: [exec_net]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 2200m
+    cpus: "2.0"
+    healthcheck:
+      test: ["CMD", "/opt/venv/bin/python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8081/ping', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 25s
+    logging: &log
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  app:
+    image: rpraxe:${RPRAXE_IMAGE_TAG:-2}
+    env_file: [rpraxe.env]
+    environment:
+      RPRAXE_SERVE: app
+      RPRAXE_RUNNER_PROMIT: "0"
+      RPRAXE_RUNNER: http://runner:8081
+    volumes:
+      - ./state:/data/state
+      # app smí do dat zapisovat (nahrání CSV učitelem); runner je má dál jen pro čtení
+      - ./datasets:/data/datasets
+    ports:
+      - "${RPRAXE_BIND:-127.0.0.1}:${RPRAXE_PORT:-8710}:8080"
+    tmpfs:
+      - /work:size=64m,mode=1777,uid=4242,gid=4242
+    depends_on: [runner]
+    restart: unless-stopped
+    networks: [exec_net, egress]
+    healthcheck:
+      test: ["CMD", "/opt/venv/bin/python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 25s
+    logging: *log
+
+volumes:
+  runner-state:
+
+networks:
+  exec_net:
+    driver: bridge
+    internal: true      # žádné rozhraní ven, žádná DNS
+  egress:
+    driver: bridge

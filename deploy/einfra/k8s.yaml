@@ -1,0 +1,239 @@
+# rpraxe na Kubernetes (CERIT-SC / e-INFRA CZ / MetaCentrum)
+#
+# Dva soubory stačí: nejdřív secrets, pak zbytek.
+#   kubectl apply -f secrets.yaml     # až po vyplnění hodnot
+#   kubectl apply -f k8s.yaml
+#
+# Jestli namespace vytváříš přes Rancher, `namespace` přeskoč a aplikuj to
+# v něm. Jméno namespace musí odpovídat tomu, co ti cluster přidělil.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rpraxe
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rpraxe-data
+  labels:
+    app: rpraxe
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Storage class pro kuba-cluster (CERIT-SC). Jiný cluster = jiný název,
+  # vypíše ho `kubectl get storageclass`.
+  storageClassName: nfs-csi
+  resources:
+    requests:
+      # databáze i datové soubory jsou v řádu MB; rezerva ať vydrží rok
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rpraxe
+  labels:
+    app: rpraxe
+spec:
+  # Jedna replica a Recreate: data jsou SQLite a ta se nesmí otevřít pro zápis
+  # ze dvou podcastů najednou.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rpraxe
+  template:
+    metadata:
+      labels:
+        app: rpraxe
+    spec:
+      terminationGracePeriodSeconds: 30
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 4242
+        # obraz má /data i /work vlastněné skupinou 0, takže stačí přidělit
+        # supplementary group 0 — žádný chown celého svazku při startu
+        fsGroup: 0
+        runAsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: rpraxe
+          # JEDEN obraz: aplikace i sandbox R uvnitř (RPRAXE_RUNNER_PROMIT=1).
+          # Public image na GitHubu: ghcr.io/<vlastník>/rpraxe. Nahrajete-li si
+          # image do registry clusteru, napište például hub.cerit.io/<projekt>/rpraxe.
+          image: ghcr.io/VASE-UCET/rpraxe:latest
+          # s `latest` vždy zkontrolovat registry; při nasazení pinujte tag
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # adresa AI modelu. Domácí Ollama tady nefunguje — použij e-INFRA CZ,
+            # OpenAI, nebo vlastní endpoint, který se z clusteru dostane ven.
+            - name: RPRAXE_PROVIDER
+              value: einfra
+            - name: RPRAXE_STATE_DIR
+              value: /data/state
+            - name: RPRAXE_DATASETS
+              value: /data/datasets
+            # běžiště sandboxu je prázdný adresář v podu, data se do něj
+            # kopírují; emptyDir je tím pádem kratkodobý prostor
+            - name: RPRAXE_WORK
+              value: /work
+            - name: RPRAXE_STATE
+              value: /work/state
+            # RPRAXE_RUNNER se nastavovat nemusí: zaběhne sandbox tady v podu
+            # a entrypoint si localhost dosadí sám
+            # první účet: aplikuje se jen tehdy, když ještě není state/users.json
+            # (prázdný svazek). Pak se účty spravují ze správny.
+            - name: RPRAXE_USERS
+              value: ucitel:admin
+            - name: RPRAXE_PASS_UCITEL
+              valueFrom:
+                secretKeyRef:
+                  name: rpraxe-secrets
+                  key: ucitel-heslo
+            # bez klíče appka běží dál, jen nefunguje AI kouč
+            - name: RPRAXE_AI_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rpraxe-ai
+                  key: key
+                  optional: true
+          resources:
+            requests:
+              cpu: 300m
+              memory: 700Mi
+            limits:
+              cpu: "2"
+              memory: 2200Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 4
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 25
+            periodSeconds: 20
+            timeoutSeconds: 4
+            failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 3
+            failureThreshold: 40
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: work
+              mountPath: /work
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rpraxe-data
+        - name: work
+          emptyDir:
+            sizeLimit: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rpraxe
+  labels:
+    app: rpraxe
+spec:
+  selector:
+    app: rpraxe
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# Veřejný přístup. Na kuba-cluster je ingress třída `nginx-traefik` a adresa
+# končí na .app.e-infra.cz (certifikát řídí cert-manager / kube-lego clusteru).
+# Ověř si třídu a doménu v dokumentaci clusteru, než to aplikuješ.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rpraxe
+  labels:
+    app: rpraxe
+  annotations:
+    # Max. velikost uploadu CSV; ingress nginx default je 1 MB.
+    nginx.ingress.kubernetes.io/proxy-body-size: 12m
+spec:
+  ingressClassName: nginx-traefik
+  rules:
+    - host: rpraxe.app.e-infra.cz     # nahraď jménem, které ti cluster přidělí
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rpraxe
+                port:
+                  name: http
+---
+# Doporučené zúžení sítě. Sandbox R běží v témže podu jako aplikace, takže
+# síťová politika platí pro oba — internet je pak dostupný jen tam, kam
+# aplikace potřebuje (model, případně GitHub pro import úloh). Bez téhle
+# politiky má kontejner ven normální přístup a u studentova kódu se pak
+# spolehujeme jen na limity a na režim `direct` bez uživatele sandbox.
+#
+# `ipBlock` s `except` pouští ven přes IPv4 a vynechává privátní rozsahy,
+# tedy nic z vnitřní sítě clusteru. Pokud ven nepotřebujete vůbec, nechte
+# `policyTypes: [Egress]` a sekci `egress` s adresami smažte.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rpraxe-egress
+  labels:
+    app: rpraxe
+spec:
+  podSelector:
+    matchLabels:
+      app: rpraxe
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # vstup jen od ingress controlleru a jen na HTTP port
+    - ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    # DNS v clusteru
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # HTTPS ven — AI provider a import úloh z GitHubu
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP

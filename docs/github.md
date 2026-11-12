@@ -64,7 +64,7 @@ JSON — buď rovnou pole úloh, nebo objekt `{"ukoly": [...]}`. Klíče můžou
 ## Pravidla, která kontrola musí splnit
 
 1. `reseni` + `kontrola` v sandboxu **projde**.
-2. Prázdný kód a `kostra` kontrolou **nep projdou** — jinak by úloha šla
+2. Prázdný kód a `kostra` kontrolou **neprojdou** — jinak by úloha šla
    splnit bez práce.
 3. Kontrola počítá očekávanou hodnotu z dat, netvrdí nic napevno.
 

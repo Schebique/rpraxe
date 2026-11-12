@@ -1,14 +1,24 @@
 """rpraxe runner — izolovaný běh R kódu + automatická kontrola.
 
 POST /run {code, check?, datasets, libraries, plots}
-Kód studenta běží jako neprivilegovaný uživatel `sandbox` v dočasném adresáři,
-kam se zkopírují jen datové soubory, které úloha potřebuje. Limity: CPU, RAM,
-velikost souboru, počet procesů, wall-clock timeout.
+Kód studenta běží v dočasném adresáři, kam se zkopírují jen datové soubory,
+které úloha potřebuje. Limity: CPU, RAM, velikost souboru, počet procesů,
+wall-clock timeout.
+
+Dva režimy podle toho, kdo server spustí:
+  * `drop` — server běží jako root (docker compose doma): každý běh spadne
+    pod uživatele `sandbox` přes `setpriv`.
+  * `direct` — server už neběží jako root (Kubernetes/CESNET, rootless
+    containers, `podman`). R běží pod stejným UID jako server; izolaci tam
+    drží cgroups a limity níže, případně síťová politika clusteru. `setpriv`
+    by v tomhle režimu skončil EPERM, proto se nepoužije.
+Režim se volí sám podle efektivního UID; vynutit lze `RPRAXE_SANDBOX_MODE`.
 """
 from __future__ import annotations
 
 import json
 import os
+import pwd
 import resource
 import shutil
 import subprocess
@@ -22,6 +32,10 @@ from pydantic import BaseModel
 app = FastAPI(title="rpraxe-runner", docs_url=None, redoc_url=None)
 
 DATASETS = Path(os.environ.get("RPRAXE_DATASETS", "/data/datasets"))
+WORK = Path(os.environ.get("RPRAXE_WORK", "/work"))          # dočasné běžiště
+STATE_DIR = Path(os.environ.get("RPRAXE_STATE", "/work/state"))
+SANDBOX_USER = os.environ.get("RPRAXE_SANDBOX_USER", "sandbox")
+SANDBOX_MODE = os.environ.get("RPRAXE_SANDBOX_MODE", "auto").strip().lower()  # auto|drop|direct
 SANDBOX_UID = int(os.environ.get("RPRAXE_SANDBOX_UID", "4242"))
 SANDBOX_GID = int(os.environ.get("RPRAXE_SANDBOX_GID", "4242"))
 CPU_LIMIT = int(os.environ.get("RPRAXE_CPU_LIMIT", "20"))
@@ -29,6 +43,32 @@ WALL_LIMIT = int(os.environ.get("RPRAXE_WALL_LIMIT", "30"))
 MEM_MB = int(os.environ.get("RPRAXE_MEM_MB", "1500"))
 OUT_BYTES = 40_000
 REPORT_MARK = "@@RPRAXE@@"
+
+
+def sandbox_mode() -> str:
+    """`drop` = R spadne pod uživatele sandbox, `direct` = běží pod UID serveru.
+
+    Volí se samo: `setpriv` umí měnit UID jen root, a kdybychom ho pustili z
+    ne-root kontejneru (Kubernetes `runAsNonRoot`), každé spuštění skončí EPERM.
+    V takovém prostředí drží izolaci cgroup limity, rlimits a síťová politika.
+    """
+    if SANDBOX_MODE in ("drop", "direct"):
+        return SANDBOX_MODE
+    if os.geteuid() != 0:
+        return "direct"
+    try:
+        pwd.getpwnam(SANDBOX_USER)
+    except KeyError:
+        return "direct"
+    return "drop"
+
+
+def run_ids() -> tuple[int, int]:
+    """UID/GID, pod kterým reálně poběží R — podle nich se nastavují práva v běžišti."""
+    if sandbox_mode() == "drop":
+        return SANDBOX_UID, SANDBOX_GID
+    return os.geteuid(), os.getegid()
+
 
 R_ENV = {
     "PATH": "/usr/local/bin:/usr/bin:/bin",
@@ -220,27 +260,41 @@ def build_script(req: RunReq) -> str:
     )
 
 
-def _run(workdir: Path, code: str, script: str) -> tuple[int, str, str]:
+def _run(workdir: Path, code: str, script: str) -> tuple[int, str, str, int]:
     (workdir / ".rpraxe_user.R").write_text(code, encoding="utf-8")
     (workdir / ".rpraxe_run.R").write_text(script, encoding="utf-8")
     os.chmod(workdir, 0o755)
-    os.chown(workdir, SANDBOX_UID, SANDBOX_GID)
+    uid, gid = run_ids()
+    # vlastnictví nastavíme jen tam, kde k tomu máme právo (v režimu `direct`
+    # soubory patří nám a měnit je nemusíme)
+    try:
+        os.chown(workdir, uid, gid)
+    except PermissionError:
+        pass
     for f in workdir.iterdir():
         if f.is_file():
             os.chmod(f, 0o644)
-            os.chown(f, SANDBOX_UID, SANDBOX_GID)
+            try:
+                os.chown(f, uid, gid)
+            except PermissionError:
+                pass
+    cmd = []
+    if sandbox_mode() == "drop":
+        cmd += ["setpriv", "--reuid", str(SANDBOX_UID), "--regid", str(SANDBOX_GID),
+                "--clear-groups", "--"]
+    cmd += ["timeout", "--foreground", "-k", "2", str(WALL_LIMIT),
+            "Rscript", "--vanilla", "--no-save", "--no-restore", ".rpraxe_run.R"]
     try:
         proc = subprocess.run(
-            ["setpriv", "--reuid", str(SANDBOX_UID), "--regid", str(SANDBOX_GID), "--clear-groups", "--",
-             "timeout", "--foreground", "-k", "2", str(WALL_LIMIT),
-             "Rscript", "--vanilla", "--no-save", "--no-restore", ".rpraxe_run.R"],
+            cmd,
             cwd=workdir, capture_output=True, text=True, timeout=WALL_LIMIT + 8,
             preexec_fn=_limits, env=R_ENV,
         )
-        return proc.returncode, proc.stdout, proc.stderr
+        return proc.returncode, proc.stdout, proc.stderr, uid  # -24 = SIGXFSZ (FSIZE)
     except subprocess.TimeoutExpired:
         return 124, "", (f"Skript bezel dele nez {WALL_LIMIT} s a byl zastaven. "
-                         "Casto pomuze neopakovat ten stejny vypocet dokola nebo prestat nekonecnou smycku.")
+                         "Casto pomuze neopakovat ten stejny vypocet dokola nebo prestat nekonecnou smycku."), uid
+
 
 
 def _parse_report(stderr_text: str) -> tuple[dict, str]:
@@ -257,11 +311,76 @@ def _parse_report(stderr_text: str) -> tuple[dict, str]:
     return report, "\n".join(clean)
 
 
+_R_VERSION = ""
+
+
+def r_version() -> str:
+    """Verze R zjištěná jednou za běh serveru — `Rscript` se kvůli tomu nespouští znovu."""
+    global _R_VERSION
+    if not _R_VERSION:
+        p = subprocess.run(["Rscript", "-e", "cat(R.version.string)"],
+                           capture_output=True, text=True)
+        _R_VERSION = p.stdout.strip() or "R nejde spustit"
+    return _R_VERSION
+
+
+@app.get("/ping")
+def ping():
+    """Lehká sonda pro healthcheck a proby — žádný podproces, žádný glob."""
+    uid, gid = run_ids()
+    return {"ok": True, "sandbox": sandbox_mode(), "uid": uid}
+
+
 @app.get("/health")
 def health():
-    p = subprocess.run(["Rscript", "-e", "cat(R.version.string)"], capture_output=True, text=True)
-    return {"ok": True, "r": p.stdout.strip(),
+    uid, gid = run_ids()
+    return {"ok": True, "r": r_version(), "sandbox": sandbox_mode(), "uid": uid,
             "datasets": sorted(p.name for p in DATASETS.glob("*") if p.is_file())[:60]}
+
+
+def _egress_blocked() -> bool:
+    """Ověří, jestli se z procesů serveru dá ven na síť (TCP 443 na 8.8.8.8).
+
+    V režimu `drop` to testujeme pod UID sandboxu, jinak pod UID serveru. Výsledek
+    se počítá jednou a cacheuje. `True` znamená „ven se nedostane“ — pozor, stejnou
+    odpověď dá i prostředí bez routu na internet; jistota je jen NetworkPolicy
+    nebo `--network none` v konfiguraci.
+    """
+    global _EGRESS_CACHE
+    if _EGRESS_CACHE is not None:
+        return _EGRESS_CACHE
+    import socket
+
+    def probe() -> bool:
+        try:
+            s = socket.socket()
+            s.settimeout(0.6)
+            s.connect(("8.8.8.8", 443))
+            s.close()
+            return False
+        except OSError:
+            return True
+
+    if sandbox_mode() == "drop":
+        pid = os.fork()
+        if pid == 0:                      # dítě: spadne pod sandbox a změří to
+            try:
+                os.setgroups([])
+                os.setgid(SANDBOX_GID)
+                os.setuid(SANDBOX_UID)
+                ok = probe()
+            except Exception:
+                ok = True
+            os._exit(0 if ok else 1)
+        _, status = os.waitpid(pid, 0)
+        blocked = os.waitstatus_to_exitcode(status) != 0
+    else:
+        blocked = probe()
+    _EGRESS_CACHE = blocked
+    return blocked
+
+
+_EGRESS_CACHE: bool | None = None
 
 
 @app.get("/limits")
@@ -278,14 +397,17 @@ def limits():
         except (OSError, ValueError):
             return nastaveno
         return nastaveno if hodnota in (0, resource.RLIM_INFINITY) else hodnota
+    uid, _ = run_ids()
     return {"dostupne": True,
             "cpu_s": _real(resource.RLIMIT_CPU, CPU_LIMIT),
             "ram_mb": _real(resource.RLIMIT_AS, MEM_MB * 1024 * 1024) // (1024 * 1024),
             "soubor_mb": _real(resource.RLIMIT_FSIZE, 20 * 1024 * 1024) // (1024 * 1024),
             "procesu": _real(resource.RLIMIT_NPROC, 96),
             "stena_s": WALL_LIMIT,
-            "bez_site": True,
-            "uid": SANDBOX_UID}
+            "bez_site": _egress_blocked(),
+            "sandbox": sandbox_mode(),
+            "uid": uid}
+
 
 
 @app.post("/run")
@@ -295,7 +417,7 @@ def run(req: RunReq) -> dict:
         return {"stdout": "", "stderr": "", "plots": [], "check": None,
                 "error": "Kod je prazdny — napis aspon jeden prikaz.", "exit": 0, "ms": 0}
 
-    workdir = Path(tempfile.mkdtemp(prefix="run-", dir="/work"))
+    workdir = Path(tempfile.mkdtemp(prefix="run-", dir=str(WORK)))
     try:
         for name in req.datasets:
             src = (DATASETS / Path(name).name).resolve()
@@ -304,11 +426,25 @@ def run(req: RunReq) -> dict:
         for name, content in req.files.items():
             (workdir / Path(name).name).write_text(str(content), encoding="utf-8")
 
-        rc, out, err = _run(workdir, req.code, build_script(req))
+        rc, out, err, uid = _run(workdir, req.code, build_script(req))
         report, err_clean = _parse_report(err)
         if not report:
-            report = {"plots": [], "check": None, "last": "",
-                      "error": (err_clean or "").strip()[:1500] or f"Skript spadl (navratovy kod {rc})."}
+            # R zabitý limitem — hlaska od `timeout`/shellu je pro zaka k nicemu
+            limitni_hlaska = {
+                124: f"Kod bezel dele nez {WALL_LIMIT} s a byl zastaven. Nejspis nekonecna "
+                     "smycka nebo prilis druhy vypocet.",
+                -24: f"Vypocet trval prilis dlouho (limit {CPU_LIMIT} s procesoroveho casu). "
+                     "Nejspis nekonecna smycka nebo prilis druhy vypocet — zkus ho zjednodusit.",
+                -25: "Program zapsal do souboru vic nez 20 MB a byl zastaven. "
+                     "Nevytvarej tak velke vysledne soubory.",
+                -7: "Dosla pamet (limit " + str(MEM_MB) + " MB). Zkus mensi data "
+                    "nebo neukladat vsechno do jedne promenne.",
+                -9: "Proces byl zastaven — pravdepodobne dosla pamet (limit "
+                    + str(MEM_MB) + " MB).",
+            }
+            zprava = limitni_hlaska.get(rc) or (err_clean or "").strip()[:1500] or \
+                f"Skript spadl (navratovy kod {rc})."
+            report = {"plots": [], "check": None, "last": "", "error": zprava}
         return {
             "stdout": _trim(out),
             "stderr": _trim(err_clean),
@@ -318,6 +454,7 @@ def run(req: RunReq) -> dict:
             "last": report.get("last") or "",
             "env": report.get("env") or [],
             "exit": rc,
+            "uid": uid,                  # pod jakým UID kód skutečně běžel
             "ms": int((time.time() - t0) * 1000),
         }
     finally:

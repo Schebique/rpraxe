@@ -1,0 +1,83 @@
+name: obraz
+
+# Public image na GitHub Container Registry: ghcr.io/<vlastnik>/<repo>
+#
+# - `latest` a `main` pri kazdem pushni na hlavni vetvu
+# - `X.Y.Z` a `vX.Y.Z` pri tagu `vX.Y.Z` — tohle je tag, ktery se doporucuje
+#   uvadet v deploy/einfra/k8s.yaml i ve vlastnim docker-compose
+#
+# Image je verejna, takze staci GITHUB_TOKEN. Presna adresa se po buildu
+# vypise do shrnuti runu; stahnout ji muze kdokoliv:
+#   docker pull ghcr.io/<vlastnik>/<repo>:latest
+#
+# Jestlize chces registry jinde (harbor.cerit.io, docker.io...), dopln vlastni
+# secret a prepis `images:` nize — rozepsano v docs/hosting.md.
+#
+# Bezpecnost: zadny z `run` kroku nesahne na nerverifikovany vstup z eventu,
+# adresa obrazu se predava pres `env:`, ne primou interpolaci `${{ }}` do shellu.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-a-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prihlasit se k registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Vytvorit metadata (tagy a labely)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # sandbox R volí režim sám: bez roota běží R pod UID kontejneru (`direct`),
+      # s rootem spadne na UID 4242 přes `setpriv` (`drop`). Pushuje jen
+      # linux/amd64 — ARM by se sice sestavil, ale nasazení bez cejchu běží na x86
+      - name: Sestavit a nahrat
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Napsat adresu do shrnuti runu
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          {
+            echo "## Image"
+            echo
+            echo '```sh'
+            echo "docker pull $IMAGE:latest"
+            echo '```'
+            echo
+            echo "Tagy: \`$(echo "$TAGS" | tr '\n' ' ')\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,68 +1,45 @@
 name: rpraxe
 
-# runner = sandbox pro R; je jen na interní síti bez východu ven
-# app    = web + adaptivní model; východ má jen na lokální Ollamu (přes název hostitele)
-services:
-  runner:
-    image: rpraxe:1
-    command: ["/opt/venv/bin/uvicorn", "runner.server:app", "--host", "0.0.0.0", "--port", "8081", "--app-dir", "/srv"]
-    environment:
-      RPRAXE_DATASETS: /data/datasets
-      RPRAXE_CPU_LIMIT: "20"
-      RPRAXE_WALL_LIMIT: "30"
-      RPRAXE_MEM_MB: "1500"
-    volumes:
-      - ./datasets:/data/datasets:ro
-    tmpfs:
-      - /work:size=256m,mode=1777
-    restart: unless-stopped
-    networks: [exec_net]
-    security_opt:
-      - no-new-privileges:true
-    pids_limit: 256
-    mem_limit: 2200m
-    cpus: "2.0"
-    healthcheck:
-      test: ["CMD", "/opt/venv/bin/python", "-c",
-             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=4).status==200 else 1)"]
-      interval: 30s
-      timeout: 6s
-      retries: 3
-      start_period: 25s
-    logging: &log
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+# JEDEN kontejner: aplikace + sandbox R uvnitř (RPRAXE_RUNNER_PROMIT=1).
+# Tohle je varianta, která běží i v Kubernetes (CESNET/e-INFRA) — tam je jeden
+# kontejner na pod nejjednodušší. Pokud chceš tvrdší izolaci R (úplný absence
+# sítě), použij docker-compose.dva-slouzby.yml.
+#
+# Pozor na práva: kontejner běží pod UID 4242, takže `state/` a `datasets/`
+# na hostiteli musí patřit tomu UID. Viz docs/hosting.md („migrace“).
 
-  app:
-    image: rpraxe:1
-    command: ["sh", "-c", "/opt/venv/bin/python /srv/scripts/check_static.py; exec /opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080 --app-dir /srv --proxy-headers --forwarded-allow-ips '*'"]
+services:
+  rpraxe:
+    image: rpraxe:${RPRAXE_IMAGE_TAG:-2}
     env_file: [rpraxe.env]
+    environment:
+      RPRAXE_RUNNER_PROMIT: "1"
+      RPRAXE_SERVE: app
     volumes:
       - ./state:/data/state
-      # app smí do dat zapisovat (nahrání CSV učitelem); runner je má dál jen pro čtení
+      # data jsou pro zápis (učitel nahraje CSV); sandbox si z nich jen čte
       - ./datasets:/data/datasets
     ports:
       # přes .env: doma 172.20.0.1 (brána je macvlan), jinak stačí 127.0.0.1
       - "${RPRAXE_BIND:-127.0.0.1}:${RPRAXE_PORT:-8710}:8080"
-    depends_on: [runner]
+    tmpfs:
+      # běžiště R: mizí s kontejnerem, na disk se nic nedostane
+      - /work:size=512m,mode=1777,uid=4242,gid=4242
     restart: unless-stopped
-    networks: [exec_net, egress]
-    # Stav aplikace najevo: healthcheck hlídá, že web odpovídá, a rotace logů
-    # ať disk nepraskne uprostřed hodiny.
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: 2600m
+    cpus: "2.0"
     healthcheck:
       test: ["CMD", "/opt/venv/bin/python", "-c",
              "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 6s
       retries: 3
-      start_period: 20s
-    logging: *log
-
-networks:
-  exec_net:
-    driver: bridge
-    internal: true
-  egress:
-    driver: bridge
+      start_period: 25s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

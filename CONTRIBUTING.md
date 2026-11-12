@@ -8,8 +8,8 @@ až v rukou člověka, který se právě učí R.
 
 ```sh
 python -m compileall app runner agent scripts tasks
-docker compose exec app /opt/venv/bin/python /srv/scripts/check_static.py
-docker compose exec app /opt/venv/bin/python /srv/scripts/validate.py
+docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/check_static.py   # service se jmenuje `rpraxe` (dřív `app`)
+docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py
 ```
 
 * `check_static.py` — každý odkaz v `index.html` existuje a každé tlačítko má
