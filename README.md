@@ -84,7 +84,7 @@ Všechno se nastavuje proměnnými prostředí — kompletní komentovaný sezna
 | `RPRAXE_USERS` | `jméno:role,…` — role `student` / `teacher` / `admin` | `lenka:student` |
 | `RPRAXE_PASS_<ÚČET>` | výchozí heslo účtu (použije se jen při prvním založení) | — |
 | `RPRAXE_SECRET` | podpis session cookie (`openssl rand -hex 32`) | vygeneruje se do `state/secret.key` |
-| `RPRAXE_PROVIDER` | `ollama` / `openai` / `anthropic` / `gemini` | `ollama` |
+| `RPRAXE_PROVIDER` | `ollama` / `openai` / `anthropic` / `gemini` / `einfra` (předvolba na `llm.ai.e-infra.cz`, viz `docs/hosting.md`) | `ollama` |
 | `RPRAXE_AI_ADRESA` | adresa modelu (Ollama, OpenAI-kompatibilní brána, e-INFRA LLM API…); `RPRAXE_OLLAMA` je starší název | `http://127.0.0.1:11434` |
 | `RPRAXE_AI_KEY` | API klíč poskytovatele (nepovinný u vlastní Ollamy) — nebo ho vyplň ve správě | prázdné |
 | `RPRAXE_MODEL` / `RPRAXE_MODEL_WRITE` | model kouče / generování úloh | `qwen3.5:9b` / `qwen3.6:35b-a3b` |
