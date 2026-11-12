@@ -72,6 +72,9 @@ RUN Rscript /srv/scripts/check_rpkgs.R \
 USER 4242:4242
 EXPOSE 8080
 ENTRYPOINT ["/srv/docker/entrypoint.sh"]
+# Startuje docker/entrypoint.sh (ENTRYPOINT), CMD je tu jen jako dokumentace —
+# entrypoint ho nečte. Adresa i port se přepisují proměnnými RPRAXE_BIND a
+# RPRAXE_PORT_INTERNAL, viz docs/hosting.md.
 CMD ["/opt/venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", \
      "--port", "8080", "--app-dir", "/srv", "--proxy-headers", \
      "--forwarded-allow-ips", "*"]

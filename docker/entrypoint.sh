@@ -91,7 +91,10 @@ fi
 # brána kvality: špatná cesta ve web/ = černá obrazovka, ať to praskne hned
 /opt/venv/bin/python /srv/scripts/check_static.py || proc "POZOR: check_static nasel problemy, startuju dal"
 
-proc "startuji aplikaci na porte ${RPRAXE_PORT_INTERNAL:-8080}, UID $(id -u)"
+# Adresa: default 0.0.0.0, aby to fungovalo i v Kubernetesu, kde health probe
+# míří na IP podu. RPRAXE_BIND=127.0.0.1 dává smysl jen s proxy před aplikací
+# (vlastní Ingress sidecar) — jinak pak kontejner není dosažitelný zvenčí.
+proc "startuji aplikaci na ${RPRAXE_BIND:-0.0.0.0}:${RPRAXE_PORT_INTERNAL:-8080}, UID $(id -u)"
 exec /opt/venv/bin/uvicorn app.main:app \
-    --host 0.0.0.0 --port "${RPRAXE_PORT_INTERNAL:-8080}" --app-dir /srv \
-    --proxy-headers --forwarded-allow-ips '*'
+    --host "${RPRAXE_BIND:-0.0.0.0}" --port "${RPRAXE_PORT_INTERNAL:-8080}" \
+    --app-dir /srv --proxy-headers --forwarded-allow-ips '*'

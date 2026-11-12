@@ -164,9 +164,15 @@ spec:
       port: 80
       targetPort: http
 ---
-# Veřejný přístup. Na kuba-cluster je ingress třída `nginx-traefik` a adresa
-# končí na .app.e-infra.cz (certifikát řídí cert-manager / kube-lego clusteru).
-# Ověř si třídu a doménu v dokumentaci clusteru, než to aplikuješ.
+# Veřejný přístup. Adresa musí končit na .dyn.cloud.e-infra.cz a to jen s
+# JEDNOU label před příponou (rpraxe.dyn.cloud.e-infra.cz) — pak cluster umí
+# DNS i wildcard certifikát bez naší práce. Vícemístné jméno potřebuje vlastní
+# Gateway, `external-dns` kotvu a certifikát z `letsencrypt-gateway`; to tady
+# neděláme, viz docs/hosting.md.
+#
+# Třída `nginx-traefik` je emulace nginxu na Traefiku. Druhá, novější cesta je
+# dát místo Ingressu dva HTTPRoute na sdílený `traefik-gateway` v kube-system
+# (websecure + web s redirectem) — cluster to pro nové appky doporučuje.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -176,10 +182,18 @@ metadata:
   annotations:
     # Max. velikost uploadu CSV; ingress nginx default je 1 MB.
     nginx.ingress.kubernetes.io/proxy-body-size: 12m
+    # Certifikát; cluster připouští jen cluster isscery, v dokumentaci figurují
+    # `letsencrypt-prod` i `letsencrypt-gateway`. Když issuance padne na issuer,
+    # zkus ten druhý (popis v docs/hosting.md).
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: nginx-traefik
+  tls:
+    - hosts:
+        - rpraxe.dyn.cloud.e-infra.cz
+      secretName: rpraxe-tls
   rules:
-    - host: rpraxe.app.e-infra.cz     # nahraď jménem, které ti cluster přidělí
+    - host: rpraxe.dyn.cloud.e-infra.cz   # jméno si zvol, musí být jednovýznamové
       http:
         paths:
           - path: /
@@ -213,8 +227,15 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # vstup jen od ingress controlleru a jen na HTTP port
-    - ports:
+    # vstup jen od brány clusteru (Traefik běžící v `kube-system`) a jen na
+    # HTTP port. Bez volby `namespaceSelector` by se do appky dostal i kontejner
+    # z cizího projektu přímo přes ClusterIP —tedy i bez přihlášení. Když by
+    # brána běžela jinde, uprav label `kubernetes.io/metadata.name`.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
         - port: 8080
           protocol: TCP
   egress:

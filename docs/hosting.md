@@ -24,6 +24,7 @@ naběhne, rozhodují dvě proměnné:
 |---|---|---|
 | `RPRAXE_SERVE` | `app` (výchozí) / `runner` | kontejner je aplikace, nebo jen běžec R |
 | `RPRAXE_RUNNER_PROMIT` | `1` (výchozí) / `0` | v aplikaci se roztočí i sandbox na localhostu |
+| `RPRAXE_BIND` | `0.0.0.0` | adresa uvnitř kontejneru; `127.0.0.1` smysluplné jen s proxy před aplikací |
 
 ## Tři způsoby, jak to postavit
 
@@ -178,6 +179,67 @@ Pozor na to, že `NetworkPolicy` v manifestu pouští ven jen 443 a DNS. Pokud
 model není dostupný přes HTTPS z clusteru, buď politiku uprav, nebo ji na začátek
 nespouštěj (je to samostatný dokument v souboru, klidně ho `kubectl delete -f`
 souhlasnou částí).
+
+### Obraz do cizí registry (např. `hub.cerit.io`)
+
+GitHub Container Registry bývá pro cizí cluster první překážka — vlastníku clusteru
+se image nejlíp dostane do registry, kterou cluster zná:
+
+```sh
+docker tag ghcr.io/<vlastnik>/rpraxe:0.3.0 hub.cerit.io/<projekt>/rpraxe:0.3.0
+docker login hub.cerit.io -u <uzivatelske-jmeno>   # heslo = CLI secret, ne heslo k účtu
+docker push hub.cerit.io/<projekt>/rpraxe:0.3.0
+```
+
+- **Přihlašovací heslo do Harboru není heslo k účtu.** Je to *CLI secret* v
+  uživatelském profilu na portálu (stejné i pro `docker login cerit.io`).
+  Nemá časový limit, ale s vypršením účtu přestává platit i on.
+- Každý má vlastní projekt s kvótou 100 GB, další projekty si zakládá v Rancheru;
+  plná adresa je `hub.cerit.io/<projekt>/<image>:<tag>`.
+- **Image uvnitř clusteru je čitelný odkudkoli** — kdo zná přesné jméno, může si
+  ho stáhnout. V obrazu proto nikdy nenechávej token ani klíč.
+- Bez docker enginu: `docker save rpraxe:0.3.0 | gzip > rpraxe.tar.gz` a
+  `docker load` u nich, nebo `skopeo copy` registry → registry.
+
+### Postup nasazení v e-INFRA (kuba-cluster)
+
+Manifiesty jsou v `deploy/einfra/k8s.yaml`; namespace si vytvoř v Rancheru,
+nebo:
+
+```sh
+kubectl -n <jmeno> apply -f deploy/einfra/k8s.yaml
+kubectl -n <jmeno> create secret generic rpraxe-secrets \
+  --from-literal=RPRAXE_SECRET_KEY="$(openssl rand -hex 32)"
+kubectl -n <jmeno> rollout restart deployment/rpraxe
+```
+
+Co je v manifestu a proč:
+
+- **Adresa.** Ingress musí končit na `.dyn.cloud.e-infra.cz` a jméno musí mít
+  jedinou label před příponou (`rpraxe.dyn.cloud.e-infra.cz`) — cluster pak
+  přidá DNS i TLS z wildcard certifikátu. Vícemístné jméno chce vlastní
+  `Gateway`, kotvu `external-dns` a issuer `letsencrypt-gateway`. Třída ingressu
+  je `nginx-traefik`; novější cesta jsou dva `HTTPRoute` na sdílený
+  `traefik-gateway` (webová adresa z něj vrací 308 na https).
+- **Issuer.** Dokumentace uvádí `letsencrypt-prod` i `letsencrypt-gateway`,
+  povolené jsou jen cluster isscery. Když se certifikát nevygeneruje, zkus v
+  anotaci ten druhý.
+- **Jedna identita.** `runAsNonRoot` + `runAsUser: 4242` + `fsGroup: 4242`, aby
+  šlo zapisovat na svazek. Bez `fsGroup` skončí entrypoint hláškou o zápisu.
+- **Síť.** `NetworkPolicy` pouští dovnitř jen bránu z `kube-system` — bez toho
+  by se do appky dostal kontejner z cizího projektu přímo po ClusterIP, tedy
+  mimo přihlašování. Ven pouští DNS a HTTPS mimo privátní rozsahy.
+- **Model.** `RPRAXE_PROVIDER=einfra`, nebo vlastní Ollama v clusteru (manifest
+  s ní počítá jako samostatná deployment, oslovíš ji přes Service).
+- **Přihlašování.** Brána e-INFRA (oauth2-proxy) posílá identitu obecnými
+  hlavičkami bez našeho tajemství, takže `RPRAXE_SSO_*` z ní rovnou nepoužiješ —
+  buď ponech účty aplikace (hesla vygeneruje správce), nebo si před to postav
+  vlastní oauth2-proxy s `--pass-user-headers` a vlastním tajemstvím.
+
+Je jedna věc, kterou izolace uvnitř jednoho podu nedá: sandbox R sdílí se sítí
+i adresu aplikace, takže studentův kód může oslovit `localhost:8080`. Oddělí ho
+až druhý kontejner (`RPRAXE_RUNNER_PROMIT=0`), který navíc dostane vlastní
+`NetworkPolicy` bez přístupu ke službě.
 
 ## Vlastní R balíčky
 
