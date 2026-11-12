@@ -1,6 +1,6 @@
 name: obraz
 
-# Public image na GitHub Container Registry: ghcr.io/<vlastnik>/<repo>
+# Public image na GitHub Container Registry: ghcr.io/<vlastnik>/rpraxe
 #
 # - `latest` a `main` pri kazdem pushni na hlavni vetvu
 # - `X.Y.Z` a `vX.Y.Z` pri tagu `vX.Y.Z` — tohle je tag, ktery se doporucuje
@@ -8,7 +8,7 @@ name: obraz
 #
 # Image je verejna, takze staci GITHUB_TOKEN. Presna adresa se po buildu
 # vypise do shrnuti runu; stahnout ji muze kdokoliv:
-#   docker pull ghcr.io/<vlastnik>/<repo>:latest
+#   docker pull ghcr.io/<vlastnik>/rpraxe:latest
 #
 # Jestlize chces registry jinde (harbor.cerit.io, docker.io...), dopln vlastni
 # secret a prepis `images:` nize — rozepsano v docs/hosting.md.
@@ -23,7 +23,10 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: ghcr.io/${{ github.repository }}
+  # Nazev image drzime na malych pismenech — GHCR je vyzaduje. Kdyby sis
+  # repozitar pojmenoval jinak, prepis IMAGE, nebo dopln `images:` do kroku
+  # s docker/metadata-action.
+  IMAGE: ghcr.io/${{ github.repository_owner }}/rpraxe
 
 permissions:
   contents: read
@@ -54,9 +57,10 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      # sandbox R volí režim sám: bez roota běží R pod UID kontejneru (`direct`),
-      # s rootem spadne na UID 4242 přes `setpriv` (`drop`). Pushuje jen
-      # linux/amd64 — ARM by se sice sestavil, ale nasazení bez cejchu běží na x86
+      # Sandbox R si rezim vybere sam: bez roota pousti R pod UID kontejneru
+      # (`direct`), s rootem spadne pres `setpriv` na UID 4242 (`drop`).
+      # Pushuje se jen linux/amd64 — ARM by se sestavil taky, ale nasazeni,
+      # ktera mame, bezi na x86.
       - name: Sestavit a nahrat
         uses: docker/build-push-action@v6
         with:

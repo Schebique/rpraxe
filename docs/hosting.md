@@ -75,7 +75,7 @@ healthcheck i loadbalancer bez zbytečné zátěže. Se `?detail=1` připojí so
 běžiště a vrátí třeba
 
 ```json
-{"ok": true, "version": "0.2.0", "sandbox_url": "http://127.0.0.1:8081",
+{"ok": true, "version": "0.3.0", "sandbox_url": "http://127.0.0.1:8081",
  "sandbox": {"ok": true, "sandbox": "direct", "uid": 4242}, "sready": true}
 ```
 

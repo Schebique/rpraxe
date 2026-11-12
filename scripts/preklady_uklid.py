@@ -6,7 +6,7 @@ nebo `web/index.html` — odtud totiž bere text rozhraní (`t("…")`) a transl
 (textové uzly v HTML). Klíč, který se nikde nevyskytuje, je pozůstatek po
 přepsané hlášce: zabírá místo v poměru pokrytí a nikdo ho nepřekládá.
 
-用法:
+Použití:
   python3 scripts/preklady_uklid.py            … jen report
   python3 scripts/preklady_uklid.py --uctej    … smaž mrtvé klíče
 """

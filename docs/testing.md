@@ -7,6 +7,9 @@
   skupina musí mít v `app.js` obsluhu. Negativní test (chybějící soubor)
   udělej v kopii adresáře `web/`, ať stráž nespadne dřív na cestách.
 * `scripts/validate.py` — solutions v sandboxu, viz `task-banks.md`.
+* `test/behriste.py` — adresa běžce R. Běží bez Dockeru, ale kontroluje i to,
+  co se ukáže až uvnitř kontejneru: `docker compose exec` nedostane proměnné z
+  entrypointu, takže skript musí poznat vestavěný sandbox sám.
 
 ## Frontend přes jsdom
 

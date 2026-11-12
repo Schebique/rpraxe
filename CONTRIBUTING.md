@@ -8,6 +8,7 @@ až v rukou člověka, který se právě učí R.
 
 ```sh
 python -m compileall app runner agent scripts tasks
+python3 test/behriste.py                              # adresa běžce R pro obě varianty
 docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/check_static.py   # service se jmenuje `rpraxe` (dřív `app`)
 docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py
 ```

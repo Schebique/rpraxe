@@ -35,7 +35,7 @@ USER = os.environ.get("RPRAXE_USER", "lenka")
 SSO_SECRET_HEADER = "x-rpraxe-sso"
 
 app = FastAPI(title="rpraxe", docs_url=None, redoc_url=None)
-VERSION = os.environ.get("RPRAXE_VERSION", "0.2.0")
+VERSION = os.environ.get("RPRAXE_VERSION", "0.3.0")
 
 # ------------------------------------------------------------------ auth ---
 
