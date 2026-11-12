@@ -80,7 +80,9 @@ async function loadBoot() {
   if (window.matchMedia && window.matchMedia("(max-width:1020px)").matches) {
     const box = $("#planbox"); if (box) box.open = false;
   }
-  if (!current && boot.items.length) openTask(boot.items[0].id);
+  if (!current && boot.items.length) {
+    await openTask(boot.items[0].id);
+  }
 }
 
 function renderMinutes() {
@@ -106,7 +108,11 @@ function renderPlan(items) {
 }
 
 async function openTask(id) {
-  const t = (await api("/api/tasks")).tasks.find(x => x.id === id) || boot.items.find(x => x.id === id);
+  let t = (boot?.items || []).find(x => x.id === id);
+  if (!t) {
+    const d = await api("/api/tasks");
+    t = (d.tasks || []).find(x => x.id === id);
+  }
   if (!t) return;
   current = t; hintStep = 0; openedAt = Date.now(); $("#hintbox").innerHTML = "";
   $("#t-title").textContent = t.title;
@@ -311,7 +317,7 @@ async function loadLib() {
       (!q || (t.title + " " + t.zadani).toLowerCase().includes(q)));
     $("#tasks").innerHTML = "<tr><th>úloha</th><th>lekce</th><th>obdrž</th><th>pokusa</th><th></th></tr>" +
       rows.map(t => `<tr>
-        <td><strong>${esc(t.title)}</strong><div class="tiny muted">${esc((t.skills || []).join(", "))} · ${esc(t.id)}</div></td>
+        <td><a href="#" class="open-task" data-id="${esc(t.id)}"><strong>${esc(t.title)}</strong></a><div class="tiny muted">${esc((t.skills || []).join(", "))} · ${esc(t.id)}</div></td>
         <td>${t.lesson}</td><td>${Number(t.level).toFixed(1)}</td>
         <td>${t.passed}/${t.attempts}</td>
         <td>${t.status === "draft" ? `<span class="pill">${t.moje ? "tvůj koncept" : "koncept"}</span>` : ""}
@@ -351,9 +357,19 @@ async function loadLib() {
       const u = await api(`/api/tasks/${b.dataset.id}`);
       if (u && u.id) upravUlohu(u); else toast("úlohu jsem nenašel");
     });
+    $$("#tasks .open-task").forEach(a => a.onclick = async (e) => {
+      e.preventDefault();
+      await api("/api/pick", { method: "POST", body: JSON.stringify({ task_id: a.dataset.id }) });
+      await loadBoot();
+      await openTask(a.dataset.id);
+      show("today", false);
+    });
     $$("#tasks .pick").forEach(b => b.onclick = async () => {
       await api("/api/pick", { method: "POST", body: JSON.stringify({ task_id: b.dataset.id }) });
-      toast("Přidáno do dnešní dávky."); await loadBoot(); show("today");
+      toast("Přidáno do dnešní dávky.");
+      await loadBoot();
+      await openTask(b.dataset.id);
+      show("today", false);
     });
   };
   [sel, $("#f-status")].forEach(e => e.onchange = render);
@@ -1165,7 +1181,9 @@ function renderProvoz(s) {
       <div><div class="muted tiny">pískoviště</div><div class="tiny">
         ${sandbox.dostupne
           ? `CPU ${sandbox.cpu_s} s · zeď ${sandbox.stena_s} s · RAM ${sandbox.ram_mb} MB ·
-             bez sítě · work ${sandbox.pracovni_mb} MB`
+             UID ${sandbox.uid} · ${sandbox.bez_site ? esc(t("bez sítě")) : esc(t("síť dostupná"))}
+             · ${sandbox.sandbox === "drop" ? esc(t("běží pod uživatelem sandbox"))
+                                            : esc(t("běží pod UID kontejneru"))}`
           : `nedostupné (${esc(sandbox.duvod || "runner neodpovídá")})`}</div></div>
       <div><div class="muted tiny">data</div><div class="tiny">
         ${data.souboru || 0} souborů${uklid ? ` · ${esc(t("úklid"))}: ${
@@ -1257,9 +1275,10 @@ async function obnovZalohu(jmeno) {
   }
 }
 
-function show(view) {
+function show(view, reload = true) {
   $$("nav button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
   $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + view));
+  if (!reload) return;
   if (view === "lib") loadLib();
   if (view === "prog") loadProg();
   if (view === "sheet") loadTahak();
@@ -2003,8 +2022,6 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-sol").onclick = async () => {
     if (!current) return;
     potvrd("Otevřít řešení? Počítá se to jako nápověda — pak to přepiš bez koukání.", showSolution, "ukázat řešení");
-    $("#hintbox").innerHTML = `<div class="coach"><strong>Řešení:</strong></div><pre class="out">${esc(r.reseni)}</pre>
-      <p class="tiny muted">${esc(r.note)}</p>`;
   };
   $("#btn-note").onclick = openNote;
   $("#note-cancel").onclick = () => { $("#notemodal").hidden = true; };
@@ -2012,8 +2029,12 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#note-delete").onclick = () => ulozPoznamku("");
   $("#notemodal").onclick = (e) => { if (e.target.id === "notemodal") $("#notemodal").hidden = true; };
   $("#btn-refresh").onclick = () => potvrd("Složit novou dnešní dávku? Dosavadní pokusy zůstanou v historii.",
-    async () => { await api("/api/plan?refresh=1"); await loadBoot(); }, "nová dávka");
-  $("#budget").onchange = async () => { await api(`/api/plan?minutes=${$("#budget").value}`); await loadBoot(); };
+    async () => { current = null; await api("/api/plan?refresh=1"); await loadBoot(); }, "nová dávka");
+  $("#budget").onchange = async () => {
+    const d = await api(`/api/plan?minutes=${$("#budget").value}`);
+    if (current && !(d.items || []).some(x => x.id === current.id)) current = null;
+    await loadBoot();
+  };
   const tlacitkoNové = $("#btn-nova");
   if (tlacitkoNové) tlacitkoNové.onclick = () => novaUloha();
   $("#btn-gen").onclick = async () => {

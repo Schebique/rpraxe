@@ -73,6 +73,9 @@ const I18N = {
       "The administrator picks the model — everyone in this instance gets the same coach.",
     "Model zatím nemá nastavený správce.": "The administrator has not set a model yet.",
     "data jdou mimo dům": "data leaves home", "data zůstávají doma": "data stays home",
+    "bez sítě": "no network", "síť dostupná": "network available",
+    "běží pod uživatelem sandbox": "runs as the sandbox user",
+    "běží pod UID kontejneru": "runs as the container UID",
   sk: {
     "Dnes": "Dnes", "Knihovna": "Knižnica", "Progres": "Progres", "Tahák": "Tahák",
     "Třída": "Trieda", "Změnit heslo": "Zmeniť heslo", "Nastavení": "Nastavenia",
@@ -100,6 +103,9 @@ const I18N = {
     "uložiť a vyskúšať": "uložiť a vyskúšať", "overiť spustením": "overiť spustením",
     "nechať skontrolovať modelom": "nechať skontrolovať modelom", "riadiace heslo brány": "heslo brány",
     "jednotné prihlasovanie je zapnuté": "jednotné prihlasovanie je zapnuté",
+    "bez sítě": "bez siete", "síť dostupná": "sieť dostupná",
+    "běží pod uživatelem sandbox": "beží pod používateľom sandbox",
+    "běží pod UID kontejneru": "beží pod UID kontajnera",
     "Model volí správca — všetci inštancii majú rovnakého kouča.":
       "Model volí správca — všetci v inštalácii majú rovnakého kouča.",
   de: {
@@ -126,6 +132,9 @@ const I18N = {
     "Nápověda": "Hilfe", "prozkoumat": "prüfen", "Model": "Modell", "Poskytovatel": "Anbieter",
     "Adresa serveru": "Server-URL", "API klíč": "API-Schlüssel", "načíst": "laden", "soubor": "Datei",
     "ověřit spuštěním": "per Ausführung prüfen", "koncept": "Entwurf", "schváleno": "freigegeben",
+    "bez sítě": "ohne Netzwerk", "síť dostupná": "Netzwerk verfügbar",
+    "běží pod uživatelem sandbox": "läuft als Sandbox-Benutzer",
+    "běží pod UID kontejneru": "läuft als Container-UID",
 };
 
 /* slovník pro placeholdery (překlad atributu, ne textového uzlu) */
@@ -182,13 +191,16 @@ function translateDom(root) {
   while ((node = walker.nextNode())) nodes.push(node);
   for (const n of nodes) {
     if (n.parentElement && ["SCRIPT", "STYLE", "CODE", "PRE"].includes(n.parentElement.tagName)) continue;
-    if (typeof n.__cs !== "string") n.__cs = n.nodeValue;
+    if (typeof n.__cs !== "string" || (typeof n.__last === "string" && n.nodeValue !== n.__last)) {
+      n.__cs = n.nodeValue;
+    }
     const key = (n.__cs || "").trim();
     if (!key || key.length > 70) continue;
     const preklad = dict[key];
     const nova = preklad ? n.__cs.replace(key, preklad) : n.__cs;
     // přiřazujeme jen při změně — jinak by observer videl změnu donekonečna
     if (n.nodeValue !== nova) n.nodeValue = nova;
+    n.__last = n.nodeValue;
   }
   if (root.querySelectorAll) {
     root.querySelectorAll("[placeholder]").forEach(el => {
