@@ -327,8 +327,9 @@ Frontend se dá ověřit i bez prohlížeče přes jsdom
 spustit na běžící instanci, projde to totiž skutečným klikáním:
 
 ```sh
-RPRAXE_URL=http://127.0.0.1:8710 node test/dom.mjs ondra   # správce
-RPRAXE_URL=http://127.0.0.1:8710 node test/dom.mjs lenka   # student
+cd test && npm install jsdom && cd ..
+RPRAXE_PASS_LENKA='…' RPRAXE_URL=http://127.0.0.1:8710 node test/dom.mjs lenka          # student
+RPRAXE_PASS_ONDRA='…' RPRAXE_URL=http://127.0.0.1:8710 node test/dom.mjs ondra admin    # správa
 ```
 
 Provoz hotové instance (zálohy, obnova, denní kontrola) má vlastní
