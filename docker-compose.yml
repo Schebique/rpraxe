@@ -10,7 +10,7 @@ name: rpraxe
 
 services:
   rpraxe:
-    image: rpraxe:${RPRAXE_IMAGE_TAG:-2}
+    image: rpraxe:${RPRAXE_IMAGE_TAG:-latest}
     env_file: [rpraxe.env]
     environment:
       RPRAXE_RUNNER_PROMIT: "1"

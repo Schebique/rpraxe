@@ -46,18 +46,18 @@ běžce spravuješ sám; návod je v [README](../README.md) v sekci *Without Doc
 ```sh
 git clone https://github.com/<vlastník>/rpraxe && cd rpraxe
 cp rpraxe.env.example rpraxe.env && chmod 600 rpraxe.env
-$EDITOR rpraxe.env            # RPRAXE_USERS a hesla
-docker pull ghcr.io/<vlastník>/rpraxe:latest
-docker tag ghcr.io/<vlastník>/rpraxe:latest rpraxe:2
+cp .env.example .env                  # RPRAXE_BIND, RPRAXE_PORT, RPRAXE_IMAGE_TAG
+$EDITOR rpraxe.env                    # RPRAXE_USERS a hesla
 mkdir -p state datasets
-sudo chown -R 4242:0 state datasets        # kontejner běží pod UID 4242
+sudo chown -R 4242:4242 state datasets   # kontejner běží pod UID 4242
+docker pull ghcr.io/<vlastník>/rpraxe:latest
 docker compose up -d
 ```
 
 `docker compose up` bez parametru sáhne po `docker-compose.yml`, tedy po
-jednokontejnerové variantě. Image si klidně pojmenuj jinak — compose čte tag z
-`RPRAXE_IMAGE_TAG` (výchozí `2`), takže stačí `RPRAXE_IMAGE_TAG=0.3.0 docker
-compose up -d`.
+jednokontejnerové variantě. Bez image z registry postavte vlastní:
+`docker compose up -d --build` — tag musí sednout na `RPRAXE_IMAGE_TAG`
+ve `.env` (výchozí `latest`), jinak compose hledá image, který nevznikl.
 
 Pak `http://127.0.0.1:8710`. Přihlášení funguje s hesly z `rpraxe.env`, dokud
 se účet nezaloží; pak žije hash v `state/users.json`.
@@ -209,9 +209,17 @@ nebo:
 ```sh
 kubectl -n <jmeno> apply -f deploy/einfra/k8s.yaml
 kubectl -n <jmeno> create secret generic rpraxe-secrets \
-  --from-literal=RPRAXE_SECRET_KEY="$(openssl rand -hex 32)"
+  --from-literal=ucitel-heslo="$(openssl rand -hex 12)"
+kubectl -n <jmeno> create secret generic rpraxe-ai \
+  --from-literal=key="<klíč od modelu, nebo celý řádek vynech>"
 kubectl -n <jmeno> rollout restart deployment/rpraxe
 ```
+
+Klíč `ucitel-heslo` manifest skutečně čte (`secretKeyRef`) — bez něj pod
+nenaběhne. Podepisovací klíč session cookie v manifestu není a nemusí
+být: aplikace si ho sama vygeneruje do `state/secret.key` na svazku, takže
+jeho změna znamená odhlášení všech. Secret `rpraxe-ai` je volitelný —
+stačí ho vynechat, pokud klíč od modelu zadáváš až ve správě.
 
 Co je v manifestu a proč:
 

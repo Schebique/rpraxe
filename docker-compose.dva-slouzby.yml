@@ -10,7 +10,7 @@ name: rpraxe-dva
 
 services:
   runner:
-    image: rpraxe:${RPRAXE_IMAGE_TAG:-2}
+    image: rpraxe:${RPRAXE_IMAGE_TAG:-latest}
     environment:
       RPRAXE_SERVE: runner
       RPRAXE_DATASETS: /data/datasets
@@ -49,7 +49,7 @@ services:
         max-file: "3"
 
   app:
-    image: rpraxe:${RPRAXE_IMAGE_TAG:-2}
+    image: rpraxe:${RPRAXE_IMAGE_TAG:-latest}
     env_file: [rpraxe.env]
     environment:
       RPRAXE_SERVE: app

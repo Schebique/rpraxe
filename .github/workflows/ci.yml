@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+# Image se builduje se stejným tagem, jaký v něm čeká výchozí `RPRAXE_IMAGE_TAG`
+# v .env — jinak by si compose sáhl do registry pro image, který v CI nevznikl.
+env:
+  TAG: ci
+
 jobs:
   banka-a-frontend:
     runs-on: ubuntu-latest
@@ -17,12 +22,15 @@ jobs:
       # obraz je R + Python; kód je v něm zapečený, takže build je zároveň
       # první brána (Dockerfile spouští scripts/check_static.py)
       - name: Postavit image
-        run: docker build -t rpraxe:1 .
+        run: docker build -t "rpraxe:${TAG}" .
 
       - name: Nastartovat stack
         run: |
           cp rpraxe.env.example rpraxe.env
           chmod 600 rpraxe.env
+          cp .env.example .env
+          mkdir -p state datasets
+          sudo chown -R 4242:4242 state datasets
           docker compose up -d
           for i in $(seq 1 40); do
             if curl -fsS -o /dev/null http://127.0.0.1:8710/; then exit 0; fi
@@ -32,15 +40,22 @@ jobs:
           exit 1
 
       - name: Syntetická data
-        run: docker compose exec -T app Rscript /srv/r/gen_datasets.R
+        run: docker compose exec -T rpraxe Rscript /srv/r/gen_datasets.R
 
       - name: Ověřit banku úloh spuštěním
         run: |
-          docker compose exec -T app /opt/venv/bin/python /srv/scripts/validate.py | tee validace.log
+          docker compose exec -T rpraxe /opt/venv/bin/python /srv/scripts/validate.py | tee validace.log
           tail -1 validace.log
 
       - name: Statická brána (odkazy a ovládání)
-        run: docker compose exec -T app /opt/venv/bin/python /srv/scripts/check_static.py
+        run: docker compose exec -T rpraxe /opt/venv/bin/python /srv/scripts/check_static.py
+
+      - name: Návody nesmí volat běžce
+        run: |
+          # sluzka v docker-compose.yml se jmenuje `rpraxe`; stary nazev
+          # `app` selze az za behu, tak to hlidame jeste pred buildem
+          ! grep -rnE 'compose exec (-T )?app ' --include='*.md' --include='*.yml' \
+            --include='*.py' --include='*.sh' .
 
       - name: Čeština bez cizích písem
         run: |

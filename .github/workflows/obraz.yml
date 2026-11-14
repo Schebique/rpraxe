@@ -2,7 +2,9 @@ name: obraz
 
 # Public image na GitHub Container Registry: ghcr.io/<vlastnik>/rpraxe
 #
-# - `latest` a `main` pri kazdem pushni na hlavni vetvu
+# - `latest` a `master` pri kazdem pushni na hlavni vetvu
+#   (hlavni vetva je `master`; kdyz ji nekdy premenujes na `main`,
+#   workflow se spusti stale — oba nazvy jsou v `on.push.branches`)
 # - `X.Y.Z` a `vX.Y.Z` pri tagu `vX.Y.Z` — tohle je tag, ktery se doporucuje
 #   uvadet v deploy/einfra/k8s.yaml i ve vlastnim docker-compose
 #
@@ -18,7 +20,7 @@ name: obraz
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -53,7 +55,7 @@ jobs:
           images: ${{ env.IMAGE }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=main,enable={{is_default_branch}}
+            type=raw,value=master,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 

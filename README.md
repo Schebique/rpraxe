@@ -45,25 +45,34 @@ Features at a glance:
 ## Rychlý start / Quickstart
 
 ```sh
-git clone <repo> && cd rpraxe
+git clone https://github.com/Schebique/rpraxe && cd rpraxe
 cp rpraxe.env.example rpraxe.env && chmod 600 rpraxe.env      # vyplň hesla účtů
-docker pull ghcr.io/<vlastník>/rpraxe:latest                   # hotový image
-docker tag ghcr.io/<vlastník>/rpraxe:latest rpraxe:2           # …nebo `docker build -t rpraxe:2 .`
-mkdir -p state datasets && sudo chown -R 4242:0 state datasets # kontejner běží pod UID 4242
-docker compose up -d
-docker compose exec rpraxe Rscript /srv/r/gen_datasets.R       # syntetická data
+cp .env.example .env                                          # bind/port/tag image
+mkdir -p state datasets && sudo chown -R 4242:4242 state datasets
+docker compose up -d --build                                  # nebo nejdřív:
+#   docker pull ghcr.io/Schebique/rpraxe:latest && docker compose up -d
+docker compose exec rpraxe Rscript /srv/r/gen_datasets.R      # syntetická data
 docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py
-curl -s 'http://127.0.0.1:8710/healthz?detail=1'               # aplikace + běžiště R
+curl -s 'http://127.0.0.1:8710/healthz?detail=1'              # aplikace + běžiště R
 ```
 
-Pak `http://127.0.0.1:8710` (nebo `http://localhost:${RPRAXE_PORT}`). První
-přihlášení funguje s hesly z `rpraxe.env`; pak si je každý změní v profilu a
-od té doby platí jen to, co je v `state/users.json`.
+`--build` sestaví image z `Dockerfile` — trvá pár minut a chce to stáhnout
+základ `rocker/r2u`. Hotový image je na GHCR, takže `docker pull` a
+`docker compose up -d` bez `--build` je rychlejší; compose čeká tag `latest`
+(předepsat v `.env` přes `RPRAXE_IMAGE_TAG`).
 
 `docker-compose.yml` je varianta **jeden kontejner** (aplikace i R uvnitř) —
 stejný chod jako v Kubernetes. Variantu, kde R běží v kontejneru **bez přístupu
 ven**, spustíš jako `docker compose -f docker-compose.dva-slouzby.yml up -d`;
 kdy a jak kterou je rozepsané v [`docs/hosting.md`](docs/hosting.md).
+
+Složky `state/` a `datasets/` musí patřit UID 4242, pod kterým kontejner běží —
+bez toho aplikace nezaloží účty a generátor dat nenapíše ani soubor.
+`chown` chce roota; v Kubernetes to zařídí `fsGroup` samo.
+
+Pak `http://127.0.0.1:8710`. Přihlášení funguje s hesly z `rpraxe.env`, dokud
+se účet nezaloží; pak si je každý změní v profilu a od té doby platí jen to,
+co je v `state/users.json`.
 
 Without Docker (during development):
 
@@ -83,7 +92,7 @@ Všechno se nastavuje proměnnými prostředí — kompletní komentovaný sezna
 |---|---|---|
 | `RPRAXE_USERS` | `jméno:role,…` — role `student` / `teacher` / `admin` | `lenka:student` |
 | `RPRAXE_PASS_<ÚČET>` | výchozí heslo účtu (použije se jen při prvním založení) | — |
-| `RPRAXE_SECRET` | podpis session cookie (`openssl rand -hex 32`) | vygeneruje se do `state/secret.key` |
+| `RPRAXE_SECRET` | **cesta** k souboru s podpisovým klíčem cookie, ne klíč sám | `state/secret.key`, vygeneruje se |
 | `RPRAXE_PROVIDER` | `ollama` / `openai` / `anthropic` / `gemini` / `einfra` (předvolba na `llm.ai.e-infra.cz`, viz `docs/hosting.md`) | `ollama` |
 | `RPRAXE_AI_ADRESA` | adresa modelu (Ollama, OpenAI-kompatibilní brána, e-INFRA LLM API…); `RPRAXE_OLLAMA` je starší název | `http://127.0.0.1:11434` |
 | `RPRAXE_AI_KEY` | API klíč poskytovatele (nepovinný u vlastní Ollamy) — nebo ho vyplň ve správě | prázdné |
@@ -92,7 +101,7 @@ Všechno se nastavuje proměnnými prostředí — kompletní komentovaný sezna
 | `RPRAXE_CPU_LIMIT`, `RPRAXE_WALL_LIMIT`, `RPRAXE_MEM_MB` | limity sandboxu | `20`, `30`, `1500` |
 | `RPRAXE_RUNNER_PROMIT` / `RPRAXE_SERVE` / `RPRAXE_RUNNER` | jak je postavený sandbox: vestavěný, nebo běžec v jiném kontejneru | `1` / `app` / `http://rpraxe-runner:8081` |
 | `RPRAXE_SSO_*` | přihlášení přes bránu, viz [docs/sso.md](docs/sso.md) | vypnuto |
-| `RPRAXE_BIND`, `RPRAXE_PORT` (v souboru `.env`) | na čem poslouchá container | `127.0.0.1:8710` |
+| `RPRAXE_BIND`, `RPRAXE_PORT`, `RPRAXE_IMAGE_TAG` (v souboru `.env`) | na čem poslouchá container a jaký tag image compose čeká | `127.0.0.1:8710`, `latest` |
 
 AI vrstva je nepovinná: bez modelu funguje zadávání, kontrola, adaptivní plán i
 progres; kouč jen odpoví z ručně psaných nápověd.
@@ -280,7 +289,7 @@ na konci napíše `N v pořádku, M s problémem z K`.
 ## Naše nasazení (domácí)
 
 Na jednom miniPC: `docker compose` (varianta dva kontejnery, takže R nemá
-přístup ven) s image `rpraxe:2`, aplikace na
+přístup ven) s image `rpraxe:latest`, aplikace na
 `172.20.0.1:8710`, před ní Caddy brána s wildcard certifikátem, DNS přes
 Pi-hole — `https://r-praxe.schebique.eu`, dostupné z LAN a tailnetu, nikdy
 veřejně. Kouč i generátor běží na Ollamě na sousedním stroji

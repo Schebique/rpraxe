@@ -5,7 +5,7 @@
 # textová čísla, duplicity, data, ISO datum, dlouhé/široké tabulky.
 # ---------------------------------------------------------------------------
 set.seed(20261102)
-out <- Sys.getenv("RPRAXE_OUT", "/srv/r/datasets")
+out <- Sys.getenv("RPRAXE_OUT", Sys.getenv("RPRAXE_DATASETS", "/data/datasets"))
 dir.create(out, recursive = TRUE, showWarnings = FALSE)
 setwd(out)
 

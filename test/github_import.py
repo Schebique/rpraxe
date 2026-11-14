@@ -1,7 +1,7 @@
 """Dovoz banky úloh z GitHubu — rozbor odkazů, stahování, normalizace, ověření.
 
 Spouští se uvnitř nádoby, kde je vidět sandbox:
-    docker compose exec app /opt/venv/bin/python -m pytest test/github_import.py -q
+    docker compose exec rpraxe /opt/venv/bin/python -m pytest test/github_import.py -q
 Síťové testy se samy vynechají, když nádoba nemá východ ven.
 """
 import asyncio
