@@ -55,9 +55,16 @@ docker compose up -d
 ```
 
 `docker compose up` bez parametru sáhne po `docker-compose.yml`, tedy po
-jednokontejnerové variantě. Bez image z registry postavte vlastní:
-`docker compose up -d --build` — tag musí sednout na `RPRAXE_IMAGE_TAG`
-ve `.env` (výchozí `latest`), jinak compose hledá image, který nevznikl.
+jednokontejnerové variantě. Image se v něm jmenuje `rpraxe:<tag>` a zároveň je
+v něm `build:` + `pull_policy: build` — pokud `rpraxe:latest` lokálně není,
+postaví se z přiloženého `Dockerfile` (`up -d --build` to udělá vždy od znova).
+Tag, který compose čeká, je `RPRAXE_IMAGE_TAG` ve `.env`; když si stavíte image
+sami pod jiným tagem, přepište ho tam. Vyžaduje to Compose **2.17 a novější**
+(`docker compose version`) — starší verze klíč `pull_policy` neznají a jdou si
+pro image do registry, kde ještě žádný není; pak pomůže `docker build -t
+rpraxe:latest .` před `up`, nebo `docker pull` z registry. S `pull_policy: build`
+se image z registry sám nestahuje — když ho berete z cizí registry, pusťte
+`docker pull` před `up` (návod níže).
 
 Pak `http://127.0.0.1:8710`. Přihlášení funguje s hesly z `rpraxe.env`, dokud
 se účet nezaloží; pak žije hash v `state/users.json`.

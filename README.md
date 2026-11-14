@@ -44,6 +44,10 @@ Features at a glance:
 
 ## Rychlý start / Quickstart
 
+Potřebuješ Docker s Compose **2.17 a novějším** (`docker compose version`) —
+starší Compose neumí říct, že se image má postavit z `Dockerfile`, a jde si ho
+nejdřív stáhnout do registry, kde ještě žádný není.
+
 ```sh
 git clone https://github.com/Schebique/rpraxe && cd rpraxe
 cp rpraxe.env.example rpraxe.env && chmod 600 rpraxe.env      # vyplň hesla účtů
@@ -56,10 +60,13 @@ docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py
 curl -s 'http://127.0.0.1:8710/healthz?detail=1'              # aplikace + běžiště R
 ```
 
-`--build` sestaví image z `Dockerfile` — trvá pár minut a chce to stáhnout
-základ `rocker/r2u`. Hotový image je na GHCR, takže `docker pull` a
-`docker compose up -d` bez `--build` je rychlejší; compose čeká tag `latest`
-(předepsat v `.env` přes `RPRAXE_IMAGE_TAG`).
+`docker compose up -d` beze `--build` použije hotový image: buď ten, co jsi
+právě sestavil, nebo `docker pull ghcr.io/Schebique/rpraxe:latest` — to je
+rychlejší a chce to jen stáhnout hotový image. `docker build -t rpraxe:latest .`
+před `up` je taky cesta; compose čeká tag `latest`, předepsat se dá v `.env`
+přes `RPRAXE_IMAGE_TAG`. V `docker-compose.yml` je `pull_policy: build`, takže
+když image lokálně není, postavit se dá přímo z repozitáře a stačí to jedno
+`up`.
 
 `docker-compose.yml` je varianta **jeden kontejner** (aplikace i R uvnitř) —
 stejný chod jako v Kubernetes. Variantu, kde R běží v kontejneru **bez přístupu
