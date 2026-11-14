@@ -48,6 +48,8 @@ Potřebuješ Docker s Compose **2.17 a novějším** (`docker compose version`);
 ten si image sám ze registry nestahuje a postaví ho z přiloženého `Dockerfile`.
 Ve starším Compose klíč `pull_policy` nefunguje a `up` se jde ptát Docker Hubu,
 kde `rpraxe` není — pak pomůže `docker build -t rpraxe:latest .` před `up`.
+Docker zatím nemáš? `scripts/priprava-docker.sh` ho nainstaluje (Ubuntu, Debian,
+Mint) — detaily v [`docs/hosting.md`](docs/hosting.md).
 
 ```sh
 git clone https://github.com/Schebique/rpraxe && cd rpraxe

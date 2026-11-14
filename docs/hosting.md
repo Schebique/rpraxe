@@ -41,6 +41,17 @@ naběhne, rozhodují dvě proměnné:
 Bez Dockeru to jde také (`python -m venv` + `Rscript`), ale pak si limity a
 běžce spravuješ sám; návod je v [README](../README.md) v sekci *Without Docker*.
 
+### Když Docker na stroji ještě není
+
+`scripts/priprava-docker.sh` nainstaluje Docker Engine i Compose plugin z
+oficiálního repozitáře a přidá tebe (uživatele, který skript pustil přes sudo) do
+skupiny `docker`: `sudo bash scripts/priprava-docker.sh`. Na Linux Mint používá
+Ubuntu repozitář — Mint nemá vlastní distribuci v repozitářích Dockeru a
+`/get.docker.com` na neznámém codename selže; kodename Ubuntu se čte z
+`UBUNTU_CODENAME` v `/etc/os-release`. Kde `curl -fsSL https://get.docker.com |
+sudo sh` funguje, udělá totéž. Po instalaci se odhlas a znovu přihlas, aby
+skupina nabyla platnosti; ověř `docker ps` bez sudo.
+
 ## Rychlý start s Docker Compose
 
 ```sh

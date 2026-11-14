@@ -10,8 +10,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
-import { JSDOM, VirtualConsole } from "jsdom";
+import { JSDOM, VirtualConsole, ResourceLoader } from "jsdom";
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(DIR, "..", "web");
@@ -51,16 +52,21 @@ vc.on("error", (...a) => errs.push("console.error: " + a.join(" ")));
 
 const dialogy = { prompt: 0, confirm: 0, alert: 0 };
 
+// Statické soubory servírujeme z disku. Od jsdom 25 se nestačí tvářit objekt
+// s fetch() — resource musi byt skutecny ResourceLoader (typ "instanceof").
+class MistniZdroj extends ResourceLoader {
+  fetch(url) {
+    const p = new URL(url).pathname.replace(/^\/static\//, "");
+    const f = path.join(WEB, p);
+    if (!fs.existsSync(f)) return Promise.reject(new Error("chybí " + p));
+    return Promise.resolve(Readable.from(fs.readFileSync(f)));
+  }
+}
+
 const dom = new JSDOM(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), {
   url: BASE + "/",
   runScripts: "dangerously",
-  resources: {
-    fetch(url) {
-      const p = new URL(url).pathname.replace(/^\/static\//, "");
-      const f = path.join(WEB, p);
-      return fs.existsSync(f) ? Promise.resolve(fs.readFileSync(f)) : Promise.reject(new Error("chybí " + p));
-    },
-  },
+  resources: new MistniZdroj(),
   pretendToBeVisual: true,
   virtualConsole: vc,
   beforeParse(window) {
