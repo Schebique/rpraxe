@@ -29,6 +29,9 @@ jobs:
           cp rpraxe.env.example rpraxe.env
           chmod 600 rpraxe.env
           cp .env.example .env
+          # `.env` by inak pretlacil $TAG a compose by si skakal pro image,
+          # ktory v CI nevznikol (presne takto padal run s tagem `1`)
+          sed -i "s/^RPRAXE_IMAGE_TAG=.*/RPRAXE_IMAGE_TAG=${TAG}/" .env
           mkdir -p state datasets
           sudo chown -R 4242:4242 state datasets
           docker compose up -d
