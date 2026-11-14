@@ -10,7 +10,6 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { JSDOM, VirtualConsole, ResourceLoader } from "jsdom";
 
@@ -53,13 +52,15 @@ vc.on("error", (...a) => errs.push("console.error: " + a.join(" ")));
 const dialogy = { prompt: 0, confirm: 0, alert: 0 };
 
 // Statické soubory servírujeme z disku. Od jsdom 25 se nestačí tvářit objekt
-// s fetch() — resource musi byt skutecny ResourceLoader (typ "instanceof").
+// s fetch() — resource musí být skutečný ResourceLoader (kontrola instanceof)
+// a fetch musí resolve-nout Buffer, ne Node stream (daleko jde rovnou do
+// iconv dekodéru, stream tam nadává na ERR_INVALID_ARG_TYPE).
 class MistniZdroj extends ResourceLoader {
   fetch(url) {
     const p = new URL(url).pathname.replace(/^\/static\//, "");
     const f = path.join(WEB, p);
     if (!fs.existsSync(f)) return Promise.reject(new Error("chybí " + p));
-    return Promise.resolve(Readable.from(fs.readFileSync(f)));
+    return Promise.resolve(fs.readFileSync(f));
   }
 }
 
@@ -226,8 +227,9 @@ d.querySelector("#btn-settings").click();
 await sleep(400);
 check("dialog nastavení se otevřel", !d.querySelector("#setmodal").hidden);
 check("motiv má tři možnosti", d.querySelectorAll("#set-theme option").length === 3);
-check("jazyků je aspoň pět", d.querySelectorAll("#set-lang option").length >= 5,
-      String(d.querySelectorAll("#set-lang option").length));
+const jazyky = [...d.querySelectorAll("#set-lang option")].map(o => o.value);
+check("nabídka jazyků obsahuje jen hotové překlady", jazyky.length >= 3 && jazyky.includes("cs") && !jazyky.includes("de") && !jazyky.includes("pl"),
+      jazyky.join(", "));
 check("uživatel nevolí model (žádný select)", !d.querySelector("#set-model"));
 const info = (d.querySelector("#set-model-info")?.textContent || "").trim();
 check("nastavení aspoň říká, který model nasadil správce", info.length > 3, info);
