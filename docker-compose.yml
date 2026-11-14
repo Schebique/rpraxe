@@ -1,7 +1,4 @@
 name: rpraxe
-# `pull_policy` je klíč od Compose 2.17; bez něj si starší i novější verze
-# sáhnou pro image do registry dřív, než se podívají, že se dá postavit.
-required_version: "2.17"
 
 # JEDEN kontejner: aplikace + sandbox R uvnitř (RPRAXE_RUNNER_PROMIT=1).
 # Tohle je varianta, která běží i v Kubernetes (CESNET/e-INFRA) — tam je jeden

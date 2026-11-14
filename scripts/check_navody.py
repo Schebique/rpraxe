@@ -22,7 +22,7 @@ CHYBY = []
 
 # ktere tagy obrazu ve skutecnosti existuji: GHCR publishuje `latest`, `master`
 # a numericke `X.Y.Z`; local `docker build` bez -t nevznikne vubec
-POVOLENE_TAGY = re.compile(r"^(latest|master|main|\d+\.\d+(\.\d+)?)$")
+POVOLENE_TAGY = re.compile(r"^(latest|master|main|ci|\d+\.\d+(\.\d+)?)$")
 
 
 def nacti(rel):
@@ -128,6 +128,33 @@ def kontroluj_prikazy(rel, start, kod):
                 CHYBY.append("%s: tag `%s` nevznikne buildem ani z GHCR" % (kam, tag))
 
 
+def kontroluj_compose():
+    """sluzba, ktera se da postavit z repozitare, musi to v compose i rikat.
+
+    Bez `build:` si `docker compose up` (i s --build) jde image stahnout. Pokud
+    ho žádná veřejná registry nezná, návod v README padne na „pull access
+    denied" — tohle se stalo naopravdu, jen co byl compose bez `build:`.
+    """
+    for rel in sorted(os.listdir(ROOT)):
+        if not re.match(r"docker-compose.*\.ya?ml$", rel):
+            continue
+        try:
+            import yaml
+
+            data = yaml.safe_load(nacti(rel)) or {}
+        except Exception:
+            continue  # rozepsanost hlídá `compose config`, tady nechal bych jen šum
+        for nazev, sluzba in (data.get("services") or {}).items():
+            sluzba = sluzba or {}
+            if not sluzba.get("build"):
+                CHYBY.append("%s: služba `%s` nemá `build:` — `up --build` je bez něj jen pull" % (rel, nazev))
+            if sluzba.get("pull_policy") != "build":
+                CHYBY.append(
+                    "%s: služba `%s` nemá `pull_policy: build` — compose by si jel pro image do registry"
+                    % (rel, nazev)
+                )
+
+
 def kontroluj_odkazy(rel, text):
     for cilo in re.findall(r"\]\((?!https?://|mailto:|#)([^)\s]+)", text):
         cesta = cilo.split("#")[0]
@@ -176,6 +203,7 @@ def main():
                 kontroluj_prikazy(rel, start, kod)
         kontroluj_odkazy(rel, text)
     kontroluj_promenne()
+    kontroluj_compose()
     if CHYBY:
         for chyba in sorted(set(CHYBY)):
             print(chyba)

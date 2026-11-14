@@ -61,8 +61,8 @@ postaví se z přiloženého `Dockerfile` (`up -d --build` to udělá vždy od z
 Tag, který compose čeká, je `RPRAXE_IMAGE_TAG` ve `.env`; když si stavíte image
 sami pod jiným tagem, přepište ho tam. Vyžaduje to Compose **2.17 a novější**
 (`docker compose version`) — starší verze klíč `pull_policy` neznají a jdou si
-pro image do registry, kde ještě žádný není; pak pomůže `docker build -t
-rpraxe:latest .` před `up`, nebo `docker pull` z registry. S `pull_policy: build`
+pro image do registry; pak pomůže `docker build -t rpraxe:latest .` před `up`,
+nebo `docker pull` z registry. S `pull_policy: build`
 se image z registry sám nestahuje — když ho berete z cizí registry, pusťte
 `docker pull` před `up` (návod níže).
 

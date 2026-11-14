@@ -44,9 +44,10 @@ Features at a glance:
 
 ## Rychlý start / Quickstart
 
-Potřebuješ Docker s Compose **2.17 a novějším** (`docker compose version`) —
-starší Compose neumí říct, že se image má postavit z `Dockerfile`, a jde si ho
-nejdřív stáhnout do registry, kde ještě žádný není.
+Potřebuješ Docker s Compose **2.17 a novějším** (`docker compose version`);
+ten si image sám ze registry nestahuje a postaví ho z přiloženého `Dockerfile`.
+Ve starším Compose klíč `pull_policy` nefunguje a `up` se jde ptát Docker Hubu,
+kde `rpraxe` není — pak pomůže `docker build -t rpraxe:latest .` před `up`.
 
 ```sh
 git clone https://github.com/Schebique/rpraxe && cd rpraxe

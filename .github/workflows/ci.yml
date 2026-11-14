@@ -26,6 +26,12 @@ jobs:
 
       - name: Nastartovat stack
         run: |
+          # `pull_policy` je klíč od Compose 2.17 — schéma compose ho
+          # nedovolí zapsat do `required_version`, proto hlídáme verzi tady
+          docker compose version
+          VER=$(docker compose version --short | tr -d 'v')
+          [ "$(printf '2.17\n%s\n' "$VER" | sort -V | head -1)" = "2.17" ] || {
+            echo "CI potrebuje Compose >= 2.17 (kvoli klíči pull_policy): $VER"; exit 1; }
           cp rpraxe.env.example rpraxe.env
           chmod 600 rpraxe.env
           cp .env.example .env
