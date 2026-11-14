@@ -50,12 +50,12 @@ jobs:
       - name: Statická brána (odkazy a ovládání)
         run: docker compose exec -T rpraxe /opt/venv/bin/python /srv/scripts/check_static.py
 
-      - name: Návody nesmí volat běžce
+      - name: Návody musí jít zkopírovat
         run: |
-          # sluzka v docker-compose.yml se jmenuje `rpraxe`; stary nazev
-          # `app` selze az za behu, tak to hlidame jeste pred buildem
-          ! grep -rnE 'compose exec (-T )?app ' --include='*.md' --include='*.yml' \
-            --include='*.py' --include='*.sh' .
+          # kontrola, že príkazy v README a docs/hosting.md sedi ke slozeni:
+          # nazvy sluzeb, cesty v repozitari, tagy obrazu, smysl promennych
+          python3 -c 'import yaml' || pip install --quiet pyyaml
+          python3 scripts/check_navody.py
 
       - name: Čeština bez cizích písem
         run: |

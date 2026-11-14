@@ -300,10 +300,17 @@ týdně a záloha jednou denně na NAS s rotací 7 dnů.
 
 ```sh
 python -m compileall app runner agent scripts tasks        # syntax
+python3 scripts/check_navody.py                            # návody sedí ke složení
 python3 scripts/validate.py                                # banka úloh i bez kontejneru
 docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/check_static.py
 docker compose exec rpraxe /opt/venv/bin/python /srv/scripts/validate.py
 ```
+
+`scripts/check_navody.py` kontroluje to, co se jinak odhalí až při instalaci
+cizím člověkem: že `docker compose exec` jmenuje skutečnou službu, že soubory,
+na které příkazy ukazují, v repozitáři jsou, že žádný návod nečeká tag obrazu,
+který `docker build` ani GHCR nedává, a že každá `RPRAXE_*` ze seznamu
+proměnných v kódu něco dělá. Běží bez Dockeru a je i v CI.
 
 Frontend se dá ověřit i bez prohlížeče přes jsdom
 ([`docs/testing.md`](docs/testing.md)) — po každé změně `web/` se to vyplatí
